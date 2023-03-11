@@ -88,11 +88,12 @@ class Robot:
     
     def strategy(self):
         if self.x_ is None and self.y_ is None:
-            return []
+            return {}
         
         distance = np.sqrt((self.x_ - self.x)**2 + (self.y_ - self.y)**2)
         if distance < ROBO_HANDLE_DIST:
-            return [(0, 0), (1, 0)] + self.arrive()
+            stop_strategy = {0: 0, 1: 0, self.arrive(): -1}
+            return stop_strategy
 
         if self.x_ - self.x > 0:
             tan = (self.y_ - self.y) / (self.x_ - self.x)
@@ -123,7 +124,7 @@ class Robot:
         if abs(angle) > np.pi/2 : speed = 0
         if abs(angle) > np.pi/4 and distance < 2 * ROBO_HANDLE_DIST : speed = 0
         rotate_speed = min(abs(angle)/self.delta_time, MAX_ROTATE_SPEED)
-        return [(0, speed), (1, -np.sign(angle) * rotate_speed)]
+        return {0: speed, 1: -np.sign(angle) * rotate_speed}
     
     def arrive(self):
         if self.todo_type == 2:
@@ -142,23 +143,7 @@ class Robot:
             self.x_ = task[0]
             self.y_ = task[1]
             self.todo_type = task[2]
-        return [(pretask[2], -1)]
-
-    def strategy_to_str(self):
-        strategy_list = self.strategy()
-        strategy_str = ""
-        for s in strategy_list:
-            if s[0] == 0:
-                strategy_str += "forward {:.0f} {:}\n".format(self.id, s[1])
-            elif s[0] == 1:
-                strategy_str += "rotate {:.0f} {:}\n".format(self.id, s[1])
-            elif s[0] == 2:
-                strategy_str += "buy {:.0f}\n".format(self.id)
-            elif s[0] == 3:
-                strategy_str += "sell {:.0f}\n".format(self.id)
-            elif s[0] == 4:
-                strategy_str += "destroy {:.0f}\n".format(self.id)
-        return strategy_str
+        return pretask[2]
 
 class Map:
     def __init__(self) -> None:
@@ -200,6 +185,32 @@ class Map:
         for h in self.handle_list:
             h: Handle
             self.handle_type_dict[h.handle_type].append(h)
+    
+    def strategy_to_str(self, strategy_dict, robot: Robot):
+        strategy_str = ""
+        for s, p in strategy_dict.items():
+            if s == 0:
+                strategy_str += "forward {:.0f} {:}\n".format(robot.id, p)
+            elif s == 1:
+                strategy_str += "rotate {:.0f} {:}\n".format(robot.id, p)
+            elif s == 2:
+                strategy_str += "buy {:.0f}\n".format(robot.id)
+            elif s == 3:
+                strategy_str += "sell {:.0f}\n".format(robot.id)
+            elif s == 4:
+                strategy_str += "destroy {:.0f}\n".format(robot.id)
+        return strategy_str
+
+    def output_strategy(self):
+        outputs = ""
+        for i in range(ROBO_NUM):
+            r: Robot = self.robot_list[i]
+            # r.strategy()
+            output = self.strategy_to_str(r.strategy(), r)
+            if output == "":
+                continue
+            outputs += output
+        return outputs
     
     def get_short_material(self):
         short_material = set()
