@@ -30,6 +30,9 @@ class Handle:
         self.material_to_list()
     
     def material_to_list(self):
+        if self.object == 1:
+            self.material_shortage = []
+            return
         material_info = "{:08b}".format(self.material)
         self.material_shortage = []
         for m in TYPE_MATERIAL[self.handle_type]:
@@ -69,16 +72,24 @@ class Robot:
         self.y = y
     
     def add_task(self, x, y, todo_type):
-        self.is_assigned_task = 1
-        if len(self.task_list) == 0:
+        if todo_type in [2, 3]:
+            self.is_assigned_task = 1
+            if len(self.task_list) == 0:
+                self.x_ = x
+                self.y_ = y
+                self.todo_type = todo_type
+            self.task_list.append((x,y,todo_type))
+        elif todo_type == 4:
+            self.is_assigned_task = 0
+            self.task_list.insert(0, (x, y, 4))
             self.x_ = x
             self.y_ = y
-        self.todo_type = todo_type
-        self.task_list.append((x,y,todo_type))
+            self.todo_type = todo_type
     
     def strategy(self):
-        if self.x_ is None:
+        if self.x_ is None and self.y_ is None:
             return []
+        
         distance = np.sqrt((self.x_ - self.x)**2 + (self.y_ - self.y)**2)
         if distance < ROBO_HANDLE_DIST:
             return [(0, 0), (1, 0)] + self.arrive()
@@ -118,18 +129,19 @@ class Robot:
             self.handle.is_assigned_pickup = 0
         elif self.todo_type == 3:
             self.handle.material_onroute[self.object_type-1] -= 1
-        elif self.todo_type == 4:
-            pass
-        self.task_list.pop(0)
+
+        pretask = self.task_list.pop(0)
         if len(self.task_list) == 0:
             self.is_assigned_task = 0
             self.x_ = None
             self.y_ = None
+            self.todo_type = 0
         else:
             task = self.task_list[0]
             self.x_ = task[0]
             self.y_ = task[1]
-        return [(self.todo_type, -1)]
+            self.todo_type = task[2]
+        return [(pretask[2], -1)]
 
     def strategy_to_str(self):
         strategy_list = self.strategy()
