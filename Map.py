@@ -27,9 +27,9 @@ class Handle:
         self.left_time = left_time
         self.material = material
         self.object = object
-        self.material_to_list()
+        self.identify_short_material()
     
-    def material_to_list(self):
+    def identify_short_material(self):
         if self.object == 1:
             self.material_shortage = []
             return
@@ -120,7 +120,8 @@ class Robot:
             else:
                 angle = abs(angle_diff)
         speed = min(distance/self.delta_time, MAX_FORE_SPEED)
-        if abs(angle) > np.pi/2 : speed = 1
+        if abs(angle) > np.pi/2 : speed = 0
+        if abs(angle) > np.pi/4 and distance < 2 * ROBO_HANDLE_DIST : speed = 0
         rotate_speed = min(abs(angle)/self.delta_time, MAX_ROTATE_SPEED)
         return [(0, speed), (1, -np.sign(angle) * rotate_speed)]
     
