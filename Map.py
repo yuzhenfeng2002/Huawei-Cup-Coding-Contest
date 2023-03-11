@@ -7,6 +7,9 @@ def print_to_txt(string: str):
     # with open("./log.txt", "a") as f:
     #     f.write(string + '\n')
 
+def distance(x1, x2, y1, y2):
+    return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+
 class Handle:
     def __init__(self, id) -> None:
         self.id = id
@@ -30,9 +33,9 @@ class Handle:
         self.identify_short_material()
     
     def identify_short_material(self):
-        if self.object == 1:
-            self.material_shortage = []
-            return
+        # if self.object == 1:
+        #     self.material_shortage = []
+        #     return
         material_info = "{:08b}".format(self.material)
         self.material_shortage = []
         for m in TYPE_MATERIAL[self.handle_type]:
@@ -108,7 +111,7 @@ class Robot:
                 theta = -np.pi + np.arctan(tan)
         
         angle_diff = theta - self.direction
-        if abs(angle_diff) < 1e-3 or abs(angle_diff - 2*np.pi) < 1e-3:
+        if abs(angle_diff) < np.pi/180 or abs(angle_diff - 2*np.pi) < np.pi/180:
             angle = 0
         elif abs(angle_diff) > np.pi:
             if angle_diff > 0:
@@ -205,8 +208,17 @@ class Map:
         outputs = ""
         for i in range(ROBO_NUM):
             r: Robot = self.robot_list[i]
-            # r.strategy()
-            output = self.strategy_to_str(r.strategy(), r)
+            strategy_dict = r.strategy()
+            for j in range(i, ROBO_NUM):
+                r_: Robot = self.robot_list[j]
+                if (np.sqrt((r.x - r_.x)**2 + (r.y - r_.y)**2) < ROBO_RADIUS_FULL * 10 and 
+                    abs(abs(r.direction - r_.direction)-np.pi) < np.pi/9):
+                    # Bigger robot rotate first
+                    angle = np.sign(r.rotate_speed) * np.pi
+                    if r.rotate_speed == 0:
+                        angle = 2 * (np.random.rand() - 0.5) * np.pi
+                    strategy_dict[1] = angle
+            output = self.strategy_to_str(strategy_dict, r)
             if output == "":
                 continue
             outputs += output
@@ -224,6 +236,10 @@ class Map:
             r: Robot
             if r.is_assigned_task == 0:
                 if r.object_type == 0:
+                    left_frame = TOTAL_TIME * 60 * FPS - self.frame
+                    left_max_distance = left_frame / FPS * MAX_FORE_SPEED
+                    if left_max_distance < MAP_SIZE * 1.414:
+                        continue
                     type_list = list(self.get_short_material())
                     for t in random.sample(type_list, len(type_list)):
                         for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
@@ -238,7 +254,7 @@ class Map:
                     for t in random.sample(MATERIAL_TYPE[r.object_type], len(MATERIAL_TYPE[r.object_type])):
                         for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
                             h: Handle
-                            if h.object == 0 and r.object_type in h.material_shortage:
+                            if r.object_type in h.material_shortage:
                                 r.add_task(h.x, h.y, 3)                                
                                 h.material_shortage.remove(r.object_type)
                                 h.material_onroute[r.object_type-1] += 1
