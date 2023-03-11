@@ -44,12 +44,7 @@ if __name__ == '__main__':
         m.set_robots_targets()
 
         sys.stdout.write('%d\n' % frame)
-        for i in range(ROBO_NUM):
-            r: Robot = m.robot_list[i]
-            output = r.strategy_to_str()
-            if output == "":
-                continue
-            sys.stdout.write(output)
+        sys.stdout.write(m.output_strategy())
         finish()
         # if frame > 200:
         #     raise KeyError
