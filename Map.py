@@ -132,6 +132,8 @@ class Robot:
         self.strategy_dict = {}
 
         if self.x_ is None or self.y_ is None:
+            stop_strategy = {FORWARD: 0, ROTATE: 0}
+            self.strategy_dict = stop_strategy
             return
 
         distance = get_distance(self.x, self.x_, self.y, self.y_)
@@ -252,24 +254,54 @@ class Map:
         return short_material
 
     def set_robots_targets(self):
+        pickup_tasks = [[] for i in range(HANDLE_OBJECT_NUM)]
+        delivery_tasks = {}
+        delivery_edges = {}
+        delivery_origins = []
+        for h in self.handle_list:
+            h: Handle
+            if h.object == 1 and h.is_assigned_pickup == 0:
+                pickup_tasks[h.handle_type - 1].append(h)
+        for h in self.handle_list:
+            short_material = h.material_shortage
+            if len(short_material) > 0:
+                delivery_tasks[h.id] = []
+                delivery_tasks_h = delivery_tasks[h.id]
+                avg_revenue = SELL_PRICE / len(short_material)
+                for m in short_material:
+                    delivery_tasks_h.append(m)
+                    for h_ in pickup_tasks[m-1]:
+                        h_: Handle
+                        delivery_edges[(h_, h)] = (m, avg_revenue, get_distance(h_.x, h.x, h_.y, h.y))
+                        delivery_origins.append(h_)
+
         for r in self.robot_list:
             r: Robot
             if r.is_assigned_task == 0:
                 if r.object_type == 0:
+                    if len(delivery_origins) <= 0:
+                        continue
                     left_frame = TOTAL_TIME * 60 * FPS - self.frame
                     left_max_distance = left_frame / FPS * MAX_FORE_SPEED
                     if left_max_distance < MAP_SIZE * 2:
                         r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
-                    type_list = list(self.get_short_material())
-                    for t in random.sample(type_list, len(type_list)):
-                        for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
-                            h: Handle
-                            if h.object == 1 and h.is_assigned_pickup == 0:
-                                r.add_task(h.x, h.y, 2, self.frame)
-                                h.is_assigned_pickup = 1
-                                break
-                        if r.is_assigned_task == 1:
-                            break
+                        continue
+                    distance_list = [get_distance(r.x, h_.x, r.y, h_.y) for h_ in delivery_origins]
+                    h_idx = np.argmin(distance_list)
+                    h = delivery_origins[h_idx]
+                    r.add_task(h.x, h.y, 2, self.frame)
+                    h.is_assigned_pickup = 1
+                    delivery_origins.pop(h_idx)
+                    # type_list = list(self.get_short_material())
+                    # for t in random.sample(type_list, len(type_list)):
+                    #     for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
+                    #         h: Handle
+                    #         if h.object == 1 and h.is_assigned_pickup == 0:
+                    #             r.add_task(h.x, h.y, 2, self.frame)
+                    #             h.is_assigned_pickup = 1
+                    #             break
+                    #     if r.is_assigned_task == 1:
+                    #         break
                 else:
                     for t in random.sample(MATERIAL_TYPE[r.object_type], len(MATERIAL_TYPE[r.object_type])):
                         for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
