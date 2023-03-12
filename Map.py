@@ -1,14 +1,45 @@
 from Params import *
 import numpy as np
 import random
+random.seed(RAND_SEED)
 
 def print_to_txt(string: str):
     pass
     # with open("./log.txt", "a") as f:
     #     f.write(string + '\n')
 
-def distance(x1, x2, y1, y2):
+def get_distance(x1, x2, y1, y2):
     return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+
+def get_theta(x1, x2, y1, y2):
+    if x2 - x1 > 0:
+        tan = (y2 - y1) / (x2 - x1)
+        theta = np.arctan(tan)
+    elif x2 - x1 == 0:
+        theta = np.sign(y2 - y1) * np.pi / 2
+    else:
+        tan = (y2 - y1) / (x2 - x1)
+        if y2 - y1 > 0:
+            theta = np.pi + np.arctan(tan)
+        else:
+            theta = -np.pi + np.arctan(tan)
+    return theta
+
+def get_angle(_theta, theta):
+    angle_diff = theta - _theta
+    if abs(angle_diff) < np.pi/180 or abs(angle_diff - 2*np.pi) < np.pi/180:
+        angle = 0
+    elif abs(angle_diff) > np.pi:
+        if angle_diff > 0:
+            angle = 2*np.pi - abs(angle_diff)
+        else:
+            angle = abs(angle_diff) - 2*np.pi
+    elif abs(angle_diff) <= np.pi:
+        if angle_diff > 0:
+            angle = - abs(angle_diff)
+        else:
+            angle = abs(angle_diff)
+    return -angle
 
 class Handle:
     def __init__(self, id) -> None:
@@ -33,9 +64,6 @@ class Handle:
         self.identify_short_material()
     
     def identify_short_material(self):
-        # if self.object == 1:
-        #     self.material_shortage = []
-        #     return
         material_info = "{:08b}".format(self.material)
         self.material_shortage = []
         for m in TYPE_MATERIAL[self.handle_type]:
@@ -61,6 +89,8 @@ class Robot:
         self.x_ = None
         self.y_ = None
         self.task_list = []
+        self.strategy_dict = {}
+        self.last_assigned_time = 0
     
     def update(self, handle, object_type, time_coeff, crash_coeff, rotate_speed, speed_x, speed_y, direction, x, y):
         self.handle: Handle = handle
@@ -74,65 +104,55 @@ class Robot:
         self.x = x
         self.y = y
     
-    def add_task(self, x, y, todo_type):
-        if todo_type in [2, 3]:
+    def add_task(self, x, y, todo_type, frame):
+        if todo_type in [BUY, SELL]:
             self.is_assigned_task = 1
+            self.last_assigned_time = frame
             if len(self.task_list) == 0:
                 self.x_ = x
                 self.y_ = y
                 self.todo_type = todo_type
             self.task_list.append((x,y,todo_type))
-        elif todo_type == 4:
+        elif todo_type == DESTROY:
             self.is_assigned_task = 0
-            self.task_list.insert(0, (x, y, 4))
             self.x_ = x
             self.y_ = y
             self.todo_type = todo_type
+            self.task_list.insert(0, (x, y, DESTROY))
+        elif todo_type == GOTO:
+            self.is_assigned_task = 0
+            self.last_assigned_time = frame
+            if len(self.task_list) == 0:
+                self.x_ = x
+                self.y_ = y
+                self.todo_type = todo_type
+            self.task_list.append((x,y,todo_type))
     
     def strategy(self):
-        if self.x_ is None and self.y_ is None:
-            return {}
-        
-        distance = np.sqrt((self.x_ - self.x)**2 + (self.y_ - self.y)**2)
-        if distance < ROBO_HANDLE_DIST:
-            stop_strategy = {0: 0, 1: 0, self.arrive(): -1}
-            return stop_strategy
+        self.strategy_dict = {}
 
-        if self.x_ - self.x > 0:
-            tan = (self.y_ - self.y) / (self.x_ - self.x)
-            theta = np.arctan(tan)
-        elif self.x_ - self.x == 0:
-            theta = np.sign(self.y_ - self.y) * np.pi / 2
-        else:
-            tan = (self.y_ - self.y) / (self.x_ - self.x)
-            if self.y_ - self.y > 0:
-                theta = np.pi + np.arctan(tan)
-            else:
-                theta = -np.pi + np.arctan(tan)
+        if self.x_ is None or self.y_ is None:
+            return
+
+        distance = get_distance(self.x, self.x_, self.y, self.y_)
+        if distance < ROBO_HANDLE_DIST:
+            stop_strategy = {FORWARD: 0, ROTATE: 0, self.arrive(): -1}
+            self.strategy_dict = stop_strategy
+            return
         
-        angle_diff = theta - self.direction
-        if abs(angle_diff) < np.pi/180 or abs(angle_diff - 2*np.pi) < np.pi/180:
-            angle = 0
-        elif abs(angle_diff) > np.pi:
-            if angle_diff > 0:
-                angle = 2*np.pi - abs(angle_diff)
-            else:
-                angle = abs(angle_diff) - 2*np.pi
-        elif abs(angle_diff) <= np.pi:
-            if angle_diff > 0:
-                angle = - abs(angle_diff)
-            else:
-                angle = abs(angle_diff)
+        theta = get_theta(self.x, self.x_, self.y, self.y_)
+        angle = get_angle(self.direction, theta)
+        
         speed = min(distance/self.delta_time, MAX_FORE_SPEED)
         if abs(angle) > np.pi/2 : speed = 0
-        if abs(angle) > np.pi/4 and distance < 2 * ROBO_HANDLE_DIST : speed = 0
+        if abs(angle) > np.pi/4 and distance < 4 * ROBO_HANDLE_DIST : speed = 0
         rotate_speed = min(abs(angle)/self.delta_time, MAX_ROTATE_SPEED)
-        return {0: speed, 1: -np.sign(angle) * rotate_speed}
+        self.strategy_dict = {FORWARD: speed, ROTATE: np.sign(angle) * rotate_speed}
     
     def arrive(self):
-        if self.todo_type == 2:
+        if self.todo_type == BUY:
             self.handle.is_assigned_pickup = 0
-        elif self.todo_type == 3:
+        elif self.todo_type == SELL:
             self.handle.material_onroute[self.object_type-1] -= 1
 
         pretask = self.task_list.pop(0)
@@ -189,36 +209,36 @@ class Map:
             h: Handle
             self.handle_type_dict[h.handle_type].append(h)
     
-    def strategy_to_str(self, strategy_dict, robot: Robot):
+    def strategy_to_str(self, robot: Robot):
         strategy_str = ""
-        for s, p in strategy_dict.items():
-            if s == 0:
+        for s, p in robot.strategy_dict.items():
+            if s == FORWARD:
                 strategy_str += "forward {:.0f} {:}\n".format(robot.id, p)
-            elif s == 1:
+            elif s == ROTATE:
                 strategy_str += "rotate {:.0f} {:}\n".format(robot.id, p)
-            elif s == 2:
+            elif s == BUY:
                 strategy_str += "buy {:.0f}\n".format(robot.id)
-            elif s == 3:
+            elif s == SELL:
                 strategy_str += "sell {:.0f}\n".format(robot.id)
-            elif s == 4:
+            elif s == DESTROY:
                 strategy_str += "destroy {:.0f}\n".format(robot.id)
         return strategy_str
 
     def output_strategy(self):
         outputs = ""
+        for r in self.robot_list:
+            r.strategy()
         for i in range(ROBO_NUM):
             r: Robot = self.robot_list[i]
-            strategy_dict = r.strategy()
             for j in range(i, ROBO_NUM):
                 r_: Robot = self.robot_list[j]
-                if (np.sqrt((r.x - r_.x)**2 + (r.y - r_.y)**2) < ROBO_RADIUS_FULL * 10 and 
-                    abs(abs(r.direction - r_.direction)-np.pi) < np.pi/9):
-                    # Bigger robot rotate first
-                    angle = np.sign(r.rotate_speed) * np.pi
-                    if r.rotate_speed == 0:
-                        angle = 2 * (np.random.rand() - 0.5) * np.pi
-                    strategy_dict[1] = angle
-            output = self.strategy_to_str(strategy_dict, r)
+                if (get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 10 and 
+                    abs(abs(r.direction - r_.direction)-np.pi) < np.pi/6):
+                    theta = get_theta(r.x, r_.x, r.y, r_.y)
+                    angle = get_angle(r.direction, theta)
+                    rotate_speed = -np.sign(angle) * np.pi
+                    r.strategy_dict[1] = rotate_speed
+            output = self.strategy_to_str(r)
             if output == "":
                 continue
             outputs += output
@@ -238,14 +258,14 @@ class Map:
                 if r.object_type == 0:
                     left_frame = TOTAL_TIME * 60 * FPS - self.frame
                     left_max_distance = left_frame / FPS * MAX_FORE_SPEED
-                    if left_max_distance < MAP_SIZE * 1.414:
-                        continue
+                    if left_max_distance < MAP_SIZE * 2:
+                        r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
                     type_list = list(self.get_short_material())
                     for t in random.sample(type_list, len(type_list)):
                         for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
                             h: Handle
                             if h.object == 1 and h.is_assigned_pickup == 0:
-                                r.add_task(h.x, h.y, 2)
+                                r.add_task(h.x, h.y, 2, self.frame)
                                 h.is_assigned_pickup = 1
                                 break
                         if r.is_assigned_task == 1:
@@ -255,12 +275,12 @@ class Map:
                         for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
                             h: Handle
                             if r.object_type in h.material_shortage:
-                                r.add_task(h.x, h.y, 3)                                
+                                r.add_task(h.x, h.y, 3, self.frame)                                
                                 h.material_shortage.remove(r.object_type)
                                 h.material_onroute[r.object_type-1] += 1
                                 break
                         if r.is_assigned_task == 1:
                             break
                     if r.is_assigned_task == 0:
-                        r.add_task(r.x, r.y, 4)
+                        r.add_task(r.x, r.y, 4, self.frame)
                         print_to_txt("no where to go")
