@@ -1,3 +1,5 @@
+import numpy as np
+
 RAND_SEED = 42
 
 
@@ -30,6 +32,11 @@ BUY = 2
 SELL = 3
 DESTROY = 4
 GOTO = 5
+
+
+
+BUY_PRICE = np.array([30,44,58,154,172,192,760])*100
+SELL_PRICE = np.array([60,76,92,225,250,275,1050])
 
 
 
