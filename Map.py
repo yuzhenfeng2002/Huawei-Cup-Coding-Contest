@@ -281,25 +281,28 @@ class Map:
                         continue
                     left_frame = TOTAL_TIME * 60 * FPS - self.frame
                     left_max_distance = left_frame / FPS * MAX_FORE_SPEED
-                    if left_max_distance < MAP_SIZE * 2:
-                        r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
-                        continue
+                    # if left_max_distance < MAP_SIZE * 2:
+                    #     r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
+                    #     continue
                     distance_list = [get_distance(r.x, h_.x, r.y, h_.y) / MAX_FORE_SPEED * STORE_COST[h_.handle_type-1] for h_ in delivery_origins]
                     h_idx = np.argmin(distance_list)
                     h = delivery_origins[h_idx]
-                    r.add_task(h.x, h.y, 2, self.frame)
-                    h.is_assigned_pickup = 1
-                    delivery_origins.pop(h_idx)
 
                     revenue_list = [-(i[1] - i[2]/MAX_FORE_SPEED*STORE_COST[i[0].handle_type-1]) for i in delivery_edges[h]]
                     for h__idx in np.argsort(revenue_list):
                         h_: Handle = delivery_edges[h][h__idx][0]
                         if h.handle_type in h_.material_shortage:
-                            r.add_task(h_.x, h_.y, SELL, self.frame)
-                            h_.material_shortage.remove(h.handle_type)
-                            h_.material_onroute[h.handle_type-1] += 1
-                            delivery_edges[h].pop(h__idx)
                             break
+                    if get_distance(r.x, h.x, r.y, h.y) + get_distance(h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
+                        r.add_task(h.x, h.y, 2, self.frame)
+                        h.is_assigned_pickup = 1
+                        delivery_origins.pop(h_idx)
+                        r.add_task(h_.x, h_.y, SELL, self.frame)
+                        h_.material_shortage.remove(h.handle_type)
+                        h_.material_onroute[h.handle_type-1] += 1
+                        delivery_edges[h].pop(h__idx)
+                    else:
+                        r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
                     # type_list = list(self.get_short_material())
                     # for t in random.sample(type_list, len(type_list)):
                     #     for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
