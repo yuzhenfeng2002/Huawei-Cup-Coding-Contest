@@ -6,7 +6,7 @@ random.seed(RAND_SEED)
 def print_to_txt(string: str):
     pass
     # with open("./log.txt", "a") as f:
-    #     f.write(string + '\n')
+    #     f.write(str(string) + '\n')
 
 def get_distance(x1, x2, y1, y2):
     return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
@@ -257,7 +257,6 @@ class Map:
         pickup_tasks = [[] for i in range(HANDLE_OBJECT_NUM)]
         delivery_tasks = {}
         delivery_edges = {}
-        delivery_origins = []
         for h in self.handle_list:
             h: Handle
             if h.object == 1 and h.is_assigned_pickup == 0:
@@ -267,14 +266,13 @@ class Map:
             if len(short_material) > 0:
                 delivery_tasks[h.id] = []
                 delivery_tasks_h = delivery_tasks[h.id]
-                avg_revenue = SELL_PRICE / len(short_material)
+                avg_revenue = (SELL_PRICE[h.handle_type-1]-BUY_PRICE[h.handle_type-1]) / len(short_material)
                 for m in short_material:
                     delivery_tasks_h.append(m)
                     for h_ in pickup_tasks[m-1]:
-                        h_: Handle
-                        delivery_edges[(h_, h)] = (m, avg_revenue, get_distance(h_.x, h.x, h_.y, h.y))
-                        delivery_origins.append(h_)
+                        delivery_edges.setdefault(h_, list()).append((h, avg_revenue, get_distance(h_.x, h.x, h_.y, h.y)))
 
+        delivery_origins = list(delivery_edges.keys())
         for r in self.robot_list:
             r: Robot
             if r.is_assigned_task == 0:
@@ -286,12 +284,22 @@ class Map:
                     if left_max_distance < MAP_SIZE * 2:
                         r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
                         continue
-                    distance_list = [get_distance(r.x, h_.x, r.y, h_.y) for h_ in delivery_origins]
+                    distance_list = [get_distance(r.x, h_.x, r.y, h_.y) / MAX_FORE_SPEED * STORE_COST[h_.handle_type-1] for h_ in delivery_origins]
                     h_idx = np.argmin(distance_list)
                     h = delivery_origins[h_idx]
                     r.add_task(h.x, h.y, 2, self.frame)
                     h.is_assigned_pickup = 1
                     delivery_origins.pop(h_idx)
+
+                    revenue_list = [-(i[1] - i[2]/MAX_FORE_SPEED*STORE_COST[i[0].handle_type-1]) for i in delivery_edges[h]]
+                    for h__idx in np.argsort(revenue_list):
+                        h_: Handle = delivery_edges[h][h__idx][0]
+                        if h.handle_type in h_.material_shortage:
+                            r.add_task(h_.x, h_.y, SELL, self.frame)
+                            h_.material_shortage.remove(h.handle_type)
+                            h_.material_onroute[h.handle_type-1] += 1
+                            delivery_edges[h].pop(h__idx)
+                            break
                     # type_list = list(self.get_short_material())
                     # for t in random.sample(type_list, len(type_list)):
                     #     for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
