@@ -263,11 +263,14 @@ public:
 class Map {
 private:
 public:
-	int frame;
-	int money;
+	int frame=0;
+	int money=0;
 	std::vector<Robot> robot_list = {};
 	std::vector<Handle> handle_list = {};
 	std::tuple<int, std::vector<Handle>> handle_type_dict = {};
+	
+	Map();
+
 	void update_map(int frame, int money) {
 		this->frame = frame;
 		this->money = money;
