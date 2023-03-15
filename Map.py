@@ -336,7 +336,12 @@ class Map:
                     theta = get_theta(r.x, r_.x, r.y, r_.y)
                     angle = get_angle(r.direction, theta)
                     rotate_speed = -np.sign(angle) * np.pi
+                    #在这里设置最终机器人角速
                     r.strategy_dict[1] = rotate_speed
+                if ((r.x < 5 and r.speed_x < -4) or (r.x > 4 and r.speed_x > 4)
+                        or (r.y < 5 and r.speed_x < -4)
+                        or (r.y > 45 and r.speed_y > 4)):
+                    r.strategy_dict[2] = 3
             output = self.strategy_to_str(r)
             if output == "":
                 continue

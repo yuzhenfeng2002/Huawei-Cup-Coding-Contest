@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <map>
-
+#include <cmath>
 const int RAND_SEED = 42;
 
 const int TOTAL_TIME = 3;
@@ -16,7 +16,7 @@ const double ROBO_RADIUS_FULL = 0.53;
 const int ROBO_DENSITY = 20;
 const int HANDLE_TYPE_NUM = 9;
 const int HANDLE_OBJECT_NUM = 7;
-const int MAX_FORE_SPEED = 6;
+int MAX_FORE_SPEED = 6;
 const int MIN_BACK_SPEED = 2;
 const double MAX_ROTATE_SPEED = 3.1415926;
 const int MAX_TRACTION = 250;
@@ -28,7 +28,7 @@ const int BUY = 2;
 const int SELL = 3;
 const int DESTROY = 4;
 const int GOTO = 5;
-
+int M_PI = 3.1415926;
 const double BIG_M = 1e6;
 std::vector<double> BUY_PRICE = {30, 44, 58, 154, 172, 192, 760, 0, 0};
 std::vector<double> SELL_PRICE = {60, 76, 92, 225, 250, 275, 1050, BIG_M, BIG_M};
@@ -50,7 +50,72 @@ void calculate_store_cost()
     STORE_COST[5] += STORE_COST[1] + STORE_COST[2];
     STORE_COST[6] += STORE_COST[3] + STORE_COST[4] + STORE_COST[5];
 }
+double get_distance(double x1, double x2, double y1, double y2)
+{
+    return sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2));
+}
 
+// 计算两点间角度
+double get_theta(double x1, double x2, double y1, double y2)
+{
+    double tan, theta;
+    if (x2 - x1 > 0)
+    {
+        tan = (y2 - y1) / (x2 - x1);
+        theta = atan(tan);
+    }
+    else if (x2 - x1 == 0)
+    {
+        theta = copysign(M_PI / 2, y2 - y1);
+    }
+    else
+    {
+        tan = (y2 - y1) / (x2 - x1);
+        if (y2 - y1 > 0)
+        {
+            theta = M_PI + atan(tan);
+        }
+        else
+        {
+            theta = -M_PI + atan(tan);
+        }
+    }
+    return theta;
+}
+
+// 计算需要旋转的角度
+double get_angle(double _theta, double theta)
+{
+    double angle_diff = theta - _theta;
+    double angle;
+    if (abs(angle_diff) < M_PI / 180 || abs(angle_diff - 2 * M_PI) < M_PI / 180)
+    {
+        angle = 0;
+    }
+    else if (abs(angle_diff) > M_PI)
+    {
+        if (angle_diff > 0)
+        {
+            angle = 2 * M_PI - abs(angle_diff);
+        }
+        else
+        {
+            angle = abs(angle_diff) - 2 * M_PI;
+        }
+    }
+    else if (abs(angle_diff) <= M_PI)
+    {
+        if (angle_diff > 0)
+        {
+            angle = -abs(angle_diff);
+        }
+        else
+        {
+            angle = abs(angle_diff);
+        }
+    }
+    return -angle;
+}
 std::map<int, std::vector<int>> TYPE_MATERIAL = {
     {1, {}},
     {2, {}},

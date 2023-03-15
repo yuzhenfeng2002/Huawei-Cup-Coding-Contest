@@ -8,6 +8,10 @@ python版本的命令为：
 ./Robot -m maps/1.txt -c ./SDK/python "python3 main.py"
 ```
 
+```shell
+./Robot_gui -m maps/1.txt -c ./my "python main.py"
+```
+
 ## 文件结构
 
 main.py

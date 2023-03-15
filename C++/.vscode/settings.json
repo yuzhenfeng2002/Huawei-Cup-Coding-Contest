@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "vector": "cpp",
+        "exception": "cpp",
+        "xstring": "cpp",
+        "cmath": "cpp",
+        "map": "cpp",
+        "tuple": "cpp"
+    }
+}
