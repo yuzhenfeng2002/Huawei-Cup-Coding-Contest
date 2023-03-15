@@ -2,16 +2,22 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <string>
 #include "Cparams.cpp"
 
+#define M_PI 3.1415926
 const double RAND_SEED = 42; // Set the value of RAND_SEED here
-const double M_PI = 3.1415926;
+// const double M_PI = 3.1415926;
 // print_to_txt(string: str): 这个函数定义了一个空函数，似乎是为了将一些信息打印到指定的文本文件中。
 // get_distance(x1, x2, y1, y2): 这个函数用于计算两点之间的欧几里得距离，输入参数是两个点的坐标。
 // get_theta(x1, x2, y1, y2): 这个函数用于计算两点之间的极角（弧度制），输入参数是两个点的坐标。
 // get_angle(_theta, theta): 这个函数用于计算角度差，即第二个角度减去第一个角度后的差值，其中输入参数是两个弧度制的角度。如果角度差值在一定范围内，则将其视为0，否则按照正负值返回差值的绝对值。
-void print_to_txt(std::string string) {
+void print_to_txt(std::string info) {
 	// Implement the print_to_txt function here
+	std::fstream f;
+	f.open("./log.txt", std::ios::out);
+	f << info << std::endl;
+	f.close();
 }
 // 计算两点间距离
 double get_distance(double x1, double x2, double y1, double y2) {
@@ -79,8 +85,9 @@ double get_angle(double _theta, double theta) {
 // 在update方法中，给定物体的类型、坐标、离开时间、物料和对象，更新物体的属性。
 // 在identify_short_material方法中，将物体上缺少的物料识别出来。
 class Handle {
+private:
 public:
-    Handle();
+	Handle();
 	Handle(int id): id(id), handle_type(0), x(0), y(0), left_time(-1), material(0), object(0), is_assigned_pickup(0), material_onroute(std::vector<int>(HANDLE_TYPE_NUM, 0)) {}
 	void update(int handle_type, int x, int y, int left_time, int material, int object) {
 		this->handle_type = handle_type;
@@ -101,18 +108,16 @@ public:
 			}
 		}
 	}
-	int get_id() const { return id; }
-	int get_handle_type() const { return handle_type; }
-	int get_x() const { return x; }
-	int get_y() const { return y; }
-	int get_left_time() const { return left_time; }
-	int get_material() const { return material; }
-	int get_object() const { return object; }
-	bool get_is_assigned_pickup() const { return is_assigned_pickup; }
-	std::vector<int> get_material_onroute() const { return material_onroute; }
-	std::vector<int> get_material_shortage() const { return material_shortage; }
-
-private:
+	// int get_id() const { return id; }
+	// int get_handle_type() const { return handle_type; }
+	// int get_x() const { return x; }
+	// int get_y() const { return y; }
+	// int get_left_time() const { return left_time; }
+	// int get_material() const { return material; }
+	// int get_object() const { return object; }
+	// bool get_is_assigned_pickup() const { return is_assigned_pickup; }
+	// std::vector<int> get_material_onroute() const { return material_onroute; }
+	// std::vector<int> get_material_shortage() const { return material_shortage; }
 	int id;
 	int handle_type;
 	int x;
@@ -154,7 +159,7 @@ private:
 public:
 	int id;
 	double delta_time;
-	Handle *handle;
+	Handle* handle;
 	int object_type;
 	double time_coeff;
 	double crash_coeff;
@@ -171,8 +176,6 @@ public:
 	std::vector<std::tuple<double, double, int>> task_list;
 	std::map<int, double> strategy_dict;
 	int last_assigned_time;
-
-
 	Robot(int id) {
 		this->id = id;
 		this->delta_time = 1 / FPS;
@@ -263,7 +266,7 @@ public:
 	int frame;
 	int money;
 	std::vector<Robot> robot_list = {};
-	std::vector<Handle> Handle_list = {};
+	std::vector<Handle> handle_list = {};
 	std::tuple<int, std::vector<Handle>> handle_type_dict = {};
 	void update_map(int frame, int money) {
 		this->frame = frame;
@@ -276,19 +279,55 @@ public:
 	}
 	void init_handles(int num) {
 		for (int i = 0; i < num; i++) {
-			Handle_list.emplace_back(Handle(i));
+			handle_list.emplace_back(Handle(i));
 		}
 	}
-	void update_robot(int id, int handle_id, int object_type, 
-        double time_coeff, double crash_coeff, double rotate_speed,
-        double speed_x, double speed_y, double direction, double x, double y){
-            try{
-                Handle *h;
-                if(handle_id != -1){
-                    h = &Handle_list[handle_id];
-                }
-                robot_list[id].handle = h;
-            }
-                
-        }
+	void update_robot(int id, int handle_id, int object_type,
+		double time_coeff, double crash_coeff, double rotate_speed,
+		double speed_x, double speed_y, double direction, double x, double y) {
+		try {
+			Handle* h;
+			if (handle_id != -1) {
+				h = &handle_list[handle_id];
+			}
+			robot_list[id].handle = h;
+			robot_list[id].object_type = object_type;
+			robot_list[id].time_coeff = time_coeff;
+			robot_list[id].crash_coeff = crash_coeff;
+			robot_list[id].rotate_speed = rotate_speed;
+			robot_list[id].speed_x = speed_x;
+			robot_list[id].speed_y = speed_y;
+			robot_list[id].direction = direction;
+			robot_list[id].x = x;
+			robot_list[id].y = y;
+		}
+		catch (...) {
+			std::string info = "size of robot_lsit: " + std::to_string(robot_list.size()) + "id: " + std::to_string(id);
+			print_to_txt(info);
+		}
+	}
+	void update_handle(int id, int handle_type, int x, int y, int left_time,
+		int material, int object) {
+		try {
+			handle_list[id].handle_type = handle_type;
+			handle_list[id].x = x;
+			handle_list[id].y = y;
+			handle_list[id].left_time = left_time;
+			handle_list[id].material = material;
+			handle_list[id].object = object;
+		}
+		catch(...){
+			std::string info = "size of robot_list: " + std::to_string(handle_type) + "id: "+ std::to_string(id);
+		}
+	}
+
+	void update_handle_type_dict_first(){}
+
+	void strategy_to_str(Robot robot){}
+
+	void output_strategy(){}
+
+	void get_short_material(){}
+
+	void set_robots_targets(){}
 };
