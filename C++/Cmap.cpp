@@ -267,7 +267,8 @@ public:
 	int money=0;
 	std::vector<Robot> robot_list = {};
 	std::vector<Handle> handle_list = {};
-	std::tuple<int, std::vector<Handle>> handle_type_dict = {};
+	// std::tuple<int, std::vector<Handle>> handle_type_dict = {};
+	std::map<int, std::vector<Handle>> handle_type_dict = {};
 	
 	Map();
 
@@ -324,7 +325,14 @@ public:
 		}
 	}
 
-	void update_handle_type_dict_first(){}
+	void update_handle_type_dict_first(){
+		for(int i = 0; i<HANDLE_TYPE_NUM; i++){
+			handle_type_dict[i + 1] = std::vector<Handle>();
+		}
+		for(Handle &h: handle_list){
+			handle_type_dict[h.handle_type].emplace_back(h);
+		}
+	}
 
 	void strategy_to_str(Robot robot){}
 
