@@ -32,11 +32,15 @@ if __name__ == '__main__':
         for i in range(handle_num):
             line = sys.stdin.readline()
             parts = line.split(' ')
-            m.update_handle(i, int(parts[0]), float(parts[1]), float(parts[2]), int(parts[3]), int(parts[4]), int(parts[5]))
+            m.update_handle(i, int(parts[0]), float(parts[1]), float(parts[2]),
+                            int(parts[3]), int(parts[4]), int(parts[5]))
         for i in range(ROBO_NUM):
             line = sys.stdin.readline()
             parts = line.split(' ')
-            m.update_robot(i, int(parts[0]), int(parts[1]), float(parts[2]), float(parts[3]), float(parts[4]), float(parts[5]), float(parts[6]), float(parts[7]), float(parts[8]), float(parts[9]))
+            m.update_robot(i, int(parts[0]), int(parts[1]), float(parts[2]),
+                           float(parts[3]), float(parts[4]), float(parts[5]),
+                           float(parts[6]), float(parts[7]), float(parts[8]),
+                           float(parts[9]))
         if frame == 1:
             m.update_handle_type_dict_first()
         read_util_ok()

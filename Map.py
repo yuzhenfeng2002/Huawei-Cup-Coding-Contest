@@ -10,9 +10,8 @@ random.seed(RAND_SEED)
 # get_theta(x1, x2, y1, y2): 这个函数用于计算两点之间的极角（弧度制），输入参数是两个点的坐标。
 # get_angle(_theta, theta): 这个函数用于计算角度差，即第二个角度减去第一个角度后的差值，其中输入参数是两个弧度制的角度。如果角度差值在一定范围内，则将其视为0，否则按照正负值返回差值的绝对值。
 def print_to_txt(string: str):
-    pass
-    # with open("./log.txt", "a") as f:
-    #     f.write(str(string) + '\n')
+    with open("./log.txt", "a") as f:
+        f.write(str(string) + '\n')
 
 
 def get_distance(x1, x2, y1, y2):
@@ -50,6 +49,38 @@ def get_angle(_theta, theta):
         else:
             angle = abs(angle_diff)
     return -angle
+
+
+#判断是否同向
+def is_syntropy(drection1, drection2):
+    if drection1 < drection2:
+        drection1, drection2 = drection2, drection1
+    if drection1 - drection2 < np.pi * 0.15:
+        return True
+    elif drection1 > np.pi * 0.85 and drection2 < -np.pi * 0.85:
+        return True
+    return False
+
+
+#判断是否反向
+def is_opposite(direction1, direction2):
+    if direction1 < direction2:
+        direction1, direction2 = direction2, direction1
+    if abs(direction1 - direction2 - np.pi) < np.pi / 6:
+        return True
+    return False
+
+
+def is_boundary(x, y, direction):
+    if (x < 2 and (direction > np.pi * 0.9 or direction < -np.pi * 0.9)):
+        return True
+    if (x > 48 and direction < np.pi * 0.1 and direction > -np.pi * 0.1):
+        return True
+    if (y < 2 and (direction > -np.pi * 0.6 and direction < -np.pi * 0.4)):
+        return True
+    if (y > 48 and direction < np.pi * 0.6 and direction < np.pi * 0.4):
+        return True
+    return False
 
 
 # 这是一个名为Handle的类，它代表了一个可操作的物体，包含一些属性和方法：
@@ -290,7 +321,8 @@ class Map:
                                        rotate_speed, speed_x, speed_y,
                                        direction, x, y)
         except:
-            print_to_txt(str((len(self.robot_list), id)))
+            pass
+            # print_to_txt(str((len(self.robot_list), id)))
 
     def update_handle(self, id, handle_type, x, y, left_time, material,
                       object):
@@ -298,7 +330,8 @@ class Map:
             self.handle_list[id].update(handle_type, x, y, left_time, material,
                                         object)
         except:
-            print_to_txt(str((len(self.handle_list), id)))
+            pass
+            # print_to_txt(str((len(self.handle_list), id)))
 
     def update_handle_type_dict_first(self):
         for i in range(HANDLE_TYPE_NUM):
@@ -326,22 +359,24 @@ class Map:
         outputs = ""
         for r in self.robot_list:
             r.strategy()
-        for i in range(ROBO_NUM):
+        for i in range(ROBO_NUM - 1):
             r: Robot = self.robot_list[i]
-            for j in range(i, ROBO_NUM):
+            for j in range(i + 1, ROBO_NUM):
                 r_: Robot = self.robot_list[j]
-                if (get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 10
-                        and abs(abs(r.direction - r_.direction) - np.pi) <
-                        np.pi / 6):
+                if (get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 8
+                        and is_opposite(r.direction, r_.direction)):
                     theta = get_theta(r.x, r_.x, r.y, r_.y)
                     angle = get_angle(r.direction, theta)
                     rotate_speed = -np.sign(angle) * np.pi
-                    #在这里设置最终机器人角速
-                    r.strategy_dict[1] = rotate_speed
-                if ((r.x < 5 and r.speed_x < -4) or (r.x > 4 and r.speed_x > 4)
-                        or (r.y < 5 and r.speed_x < -4)
-                        or (r.y > 45 and r.speed_y > 4)):
-                    r.strategy_dict[2] = 3
+                    if get_distance(r.x, r_.x, r.y,
+                                    r_.y) < ROBO_RADIUS_FULL * 3:
+                        r_.strategy_dict[1] = rotate_speed
+                        r.strategy_dict[2] = 2
+                    else:
+                        r.strategy_dict[1] = rotate_speed
+        for r in self.robot_list:
+            # if is_boundary(r.x, r.y, r.direction):
+            #     r.strategy_dict[2] = 3
             output = self.strategy_to_str(r)
             if output == "":
                 continue
@@ -408,16 +443,18 @@ class Map:
                         if h.handle_type in h_.material_shortage:
                             break
                     if get_distance(r.x, h.x, r.y, h.y) + get_distance(
-                            h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
+                            h.x, h_.x, h.y, h_.y) < left_max_distance * 0.85:
                         r.add_task(h.x, h.y, 2, self.frame)
                         h.is_assigned_pickup = 1
                         delivery_origins.pop(h_idx)
                         r.add_task(h_.x, h_.y, SELL, self.frame)
-                        h_.material_shortage.remove(h.handle_type)
+                        #防止同时操作导致找不到要清除的元素
+                        if h.handle_type in h_.material_shortage:
+                            h_.material_shortage.remove(h.handle_type)
                         h_.material_onroute[h.handle_type - 1] += 1
                         delivery_edges[h].pop(h__idx)
-                    else:
-                        r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
+                    # else:
+                    #     r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
                     # type_list = list(self.get_short_material())
                     # for t in random.sample(type_list, len(type_list)):
                     #     for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
@@ -443,4 +480,4 @@ class Map:
                             break
                     if r.is_assigned_task == 0:
                         r.add_task(r.x, r.y, 4, self.frame)
-                        print_to_txt("no where to go")
+                        # print_to_txt("no where to go")
