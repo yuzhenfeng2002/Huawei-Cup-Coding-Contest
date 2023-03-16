@@ -5,6 +5,7 @@
 class Handle
 {
 private:
+public:
     int id;
     int handle_type;
     int x;
@@ -13,7 +14,7 @@ private:
     int material;
     int object;
 
-public:
+
     Handle();
     Handle(int id);
     void update(int handle_type, int x, int y, int left_time, int material, int object);
