@@ -21,7 +21,7 @@ public:
     double y_;
     int todo_type;
     vector<tuple<double, double, int>> task_list;
-    map<double, double> strategy_dict;
+    map<int, double> strategy_dict;
     int last_assigned_time;
 
 
