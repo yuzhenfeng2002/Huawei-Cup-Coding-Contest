@@ -3,6 +3,7 @@ using namespace std;
 class Robot
 {
 private:
+public:
     int id;
     double delta_time;
     Handle handle;
@@ -23,7 +24,7 @@ private:
     map<int, double> strategy_dict;
     int last_assigned_time;
 
-public:
+
     Robot(int id);
     void update(Handle *handle, int object_type, double time_coeff, double crash_coeff, double rotate_speed, double speed_x, double speed_y, double direction, double x, double y);
     void add_task(float _x, float _y, int todo_type, int frame);
