@@ -57,7 +57,7 @@ def is_syntropy(drection1, drection2):
         drection1, drection2 = drection2, drection1
     if drection1 - drection2 < np.pi * 0.15:
         return True
-    elif drection1 > np.pi * 0.85 and drection2 < -np.pi * 0.85:
+    elif drection1 > np.pi * 0.8 and drection2 < -np.pi * 0.8:
         return True
     return False
 
@@ -66,19 +66,19 @@ def is_syntropy(drection1, drection2):
 def is_opposite(direction1, direction2):
     if direction1 < direction2:
         direction1, direction2 = direction2, direction1
-    if abs(direction1 - direction2 - np.pi) < np.pi / 6:
+    if abs(direction1 - direction2 - np.pi) < np.pi / 7:
         return True
     return False
 
 
 def is_boundary(x, y, direction):
-    if (x < 2 and (direction > np.pi * 0.9 or direction < -np.pi * 0.9)):
+    if (x < 2 and (direction > np.pi * 0.8 or direction < -np.pi * 0.8)):
         return True
-    if (x > 48 and direction < np.pi * 0.1 and direction > -np.pi * 0.1):
+    if (x > 48 and direction < np.pi * 0.2 and direction > -np.pi * 0.2):
         return True
-    if (y < 2 and (direction > -np.pi * 0.6 and direction < -np.pi * 0.4)):
+    if (y < 2 and (direction > -np.pi * 0.7 and direction < -np.pi * 0.3)):
         return True
-    if (y > 48 and direction < np.pi * 0.6 and direction < np.pi * 0.4):
+    if (y > 48 and direction < np.pi * 0.7 and direction < np.pi * 0.3):
         return True
     return False
 
@@ -179,13 +179,15 @@ class Robot:
         self.direction = 0
         self.x = 0
         self.y = 0
-
         self.is_assigned_task = 0
         self.x_ = None
         self.y_ = None
         self.task_list = []
         self.strategy_dict = {}
         self.last_assigned_time = 0
+        self.last_assigned_time
+        #用来判断机器人是否处在避让状态
+        self.is_avoid = False
 
     def update(self, handle, object_type, time_coeff, crash_coeff,
                rotate_speed, speed_x, speed_y, direction, x, y):
@@ -244,7 +246,7 @@ class Robot:
         speed = min(distance / self.delta_time, MAX_FORE_SPEED)
         if abs(angle) > np.pi / 2: speed = 0
         if abs(angle) > np.pi / 4 and distance < 4 * ROBO_HANDLE_DIST:
-            speed = 0
+            speed = 1
         rotate_speed = min(abs(angle) / self.delta_time, MAX_ROTATE_SPEED)
         self.strategy_dict = {
             FORWARD: speed,
@@ -363,20 +365,27 @@ class Map:
             r: Robot = self.robot_list[i]
             for j in range(i + 1, ROBO_NUM):
                 r_: Robot = self.robot_list[j]
-                if (get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 8
-                        and is_opposite(r.direction, r_.direction)):
+                #靠近
+                if (get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 6
+                        and (is_opposite(r.direction, r_.direction)
+                             or is_syntropy(r.direction, r_.direction))):
                     theta = get_theta(r.x, r_.x, r.y, r_.y)
                     angle = get_angle(r.direction, theta)
                     rotate_speed = -np.sign(angle) * np.pi
                     if get_distance(r.x, r_.x, r.y,
                                     r_.y) < ROBO_RADIUS_FULL * 3:
-                        r_.strategy_dict[1] = rotate_speed
-                        r.strategy_dict[2] = 2
+                        if r_.is_avoid == False:
+                            r.strategy_dict[1] = rotate_speed
+                            r.strategy_dict[0] = 2
+                            r.is_avoid = True
                     else:
-                        r.strategy_dict[1] = rotate_speed
+                        r.strategy_dict[1] = rotate_speed * 0.6
+                        r.is_avoid = False
+                #
         for r in self.robot_list:
-            # if is_boundary(r.x, r.y, r.direction):
-            #     r.strategy_dict[2] = 3
+            #如果靠近边缘则限制最大速度
+            if is_boundary(r.x, r.y, r.direction) and r.strategy_dict[0] > 4:
+                r.strategy_dict[0] = 4
             output = self.strategy_to_str(r)
             if output == "":
                 continue
@@ -443,7 +452,7 @@ class Map:
                         if h.handle_type in h_.material_shortage:
                             break
                     if get_distance(r.x, h.x, r.y, h.y) + get_distance(
-                            h.x, h_.x, h.y, h_.y) < left_max_distance * 0.85:
+                            h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
                         r.add_task(h.x, h.y, 2, self.frame)
                         h.is_assigned_pickup = 1
                         delivery_origins.pop(h_idx)
@@ -453,8 +462,8 @@ class Map:
                             h_.material_shortage.remove(h.handle_type)
                         h_.material_onroute[h.handle_type - 1] += 1
                         delivery_edges[h].pop(h__idx)
-                    # else:
-                    #     r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
+                    else:
+                        r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
                     # type_list = list(self.get_short_material())
                     # for t in random.sample(type_list, len(type_list)):
                     #     for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
