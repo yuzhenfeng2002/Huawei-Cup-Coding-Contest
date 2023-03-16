@@ -1,6 +1,7 @@
 #include "CMap.h"
 #include <fstream>
 #include <vector>
+#include <string>
 
 void print_to_txt(std::string info)
 {
@@ -93,10 +94,36 @@ void Map::update_handle_type_dict_first()
     }
 }
 
-void strategy_to_str(Robot robot) { std::string strategy_str = ""; }
+string Map::strategy_to_str(Robot robot) { 
+    std::string strategy_str = ""; 
+    for(auto& p: robot.strategy_dict){
+        if(p.first==FORWARD){
+            strategy_str += "forward " + to_string(robot.id) + " " + to_string(p.second);
+        }
+        else if(p.first == ROTATE){
+            strategy_str += "rotate "+ to_string(robot.id) + " "+ to_string(p.second);
+        }
+        else if(p.first == BUY){
+            strategy_str += "buy "+to_string(robot.id) + " "+to_string(p.second);
+        }else if(p.first == SELL){
+            strategy_str += "sell "+to_string(robot.id)+ " "+to_string(p.second);
+        }else if(p.first == DESTROY){
+            strategy_str += "destroy "+to_string(robot.id) + " "+to_string(p.second);
+        }
+        return strategy_str;
+    }
+    
+    }
 
 void output_strategy() {}
 
-void get_short_material() {}
-
+set<int> Map::get_short_material(){
+    set<int> short_material;
+    for(auto& h: handle_list){
+        for(auto ele: h.material_shortage){
+            short_material.insert(ele);
+        }
+    }
+    return short_material;
+}
 void set_robots_targets() {}

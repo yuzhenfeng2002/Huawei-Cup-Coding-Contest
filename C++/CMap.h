@@ -2,6 +2,7 @@
 #include "Robot.h"
 #include "Handle.h"
 #include <vector>
+#include <set>
 using namespace std;
 class Map
 {
@@ -13,7 +14,7 @@ public:
 	vector<Handle> handle_list;
 	std::map<int, std::vector<Handle>> handle_type_dict = {};
 
-
+	Map();
 	Map(int id);
 	void update_map(int frame, int money);
 	void init_robots();
@@ -24,7 +25,12 @@ public:
                        double direction, double x, double y);
 	void update_handle(int id, int handle_type, int x, int y, int left_time,
                         int material, int object);
-	int set_robots_targets();
+	
 	// TODO未完成
 	void Map::update_handle_type_dict_first();
+	string strategy_to_str(Robot robot);
+	string output_strategy();
+	set<int> get_short_material();
+	
+	int set_robots_targets();
 };
