@@ -1,5 +1,6 @@
 #include "CMap.h"
 #include <fstream>
+#include <vector>
 
 void print_to_txt(std::string info)
 {
