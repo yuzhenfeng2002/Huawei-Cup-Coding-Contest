@@ -115,7 +115,32 @@ string Map::strategy_to_str(Robot robot) {
     
     }
 
-void output_strategy() {}
+string Map::output_strategy() {
+    std::string outputs = "";
+		for(Robot &r: robot_list){
+			r.strategy();
+		}
+		for(int i = 0; i<ROBO_NUM; i++){
+			Robot r = robot_list[i];
+			for(int j = i; j<ROBO_NUM; j++){
+				Robot r_ = robot_list[j];
+				if(get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 10
+					&& abs(abs(r.direction - r_.direction) - M_PI) < M_PI / 6){
+						double theta = get_theta(r.x, r_.x, r.y, r_.y);
+						double angle = get_angle(r.direction, theta);
+						double rotate_speed = -1 * std::sin(angle) * M_PI;
+						r.strategy_dict[1] = rotate_speed;
+					}
+			}
+			std::string output = strategy_to_str(r);
+			if(output == ""){
+				continue;
+			}
+			outputs += output;
+
+		}
+		return outputs;
+}
 
 set<int> Map::get_short_material(){
     set<int> short_material;
