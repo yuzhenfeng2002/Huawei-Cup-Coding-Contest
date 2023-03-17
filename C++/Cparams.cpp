@@ -116,6 +116,29 @@ double get_angle(double _theta, double theta)
     }
     return -angle;
 }
+//判断是否同向
+bool is_syntropy(double direction1 ,double direction2){
+    if(direction1 < direction2){
+        swap(direction1, direction2);
+    }
+    if(direction1 - direction2 < M_PI * 0.15){
+        return true;
+    }else if(direction1> M_PI *0.8 && direction2<-1*M_PI*0.8){
+        return true;
+    }
+    return false;
+}
+
+//判断是否反向
+bool is_opposite(double direction1, double direction2){
+    if(direction1 < direction2){
+        swap(direction1, direction2);
+    }
+    if(abs(direction1 - direction2 - M_PI) < M_PI / 7){
+        return true;
+    }
+    return false;
+}
 std::map<int, std::vector<int>> TYPE_MATERIAL = {
     {1, {}},
     {2, {}},
