@@ -139,6 +139,22 @@ bool is_opposite(double direction1, double direction2){
     }
     return false;
 }
+
+bool is_boundary(double x, double y, double direction){
+    if(x<2 && (direction > M_PI *0.8 || direction <-1*M_PI *0.8)){
+        return true;
+    }
+    if(x>48&&direction<M_PI*0.2 && direction>-1 * M_PI*0.2){
+        return true;
+    }
+    if(y<2 && (direction>M_PI*0.7 && direction<M_PI*0.3)){
+        return true;
+    }
+    if(y>48 && direction<M_PI *0.7 && direction<M_PI*0.3){
+        return true;
+    }
+    return false;
+}
 std::map<int, std::vector<int>> TYPE_MATERIAL = {
     {1, {}},
     {2, {}},
