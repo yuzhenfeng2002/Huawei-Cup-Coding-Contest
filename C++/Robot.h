@@ -23,6 +23,7 @@ public:
     vector<tuple<double, double, int>> task_list;
     map<int, double> strategy_dict;
     int last_assigned_time;
+    bool is_avoid = false;
 
 
     Robot(int id);
