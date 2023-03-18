@@ -245,13 +245,6 @@ class Map:
                 continue
             outputs += output
         return outputs
-    
-    def get_short_material(self):
-        short_material = set()
-        for h in self.handle_list:
-            h: Handle
-            short_material = short_material.union(h.material_shortage)
-        return short_material
 
     def set_robots_targets(self):
         pickup_tasks = [[] for i in range(HANDLE_OBJECT_NUM)]
