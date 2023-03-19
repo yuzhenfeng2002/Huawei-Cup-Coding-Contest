@@ -424,13 +424,14 @@ class Map:
         return short_material
     
     def cal_pickup_and_delivery_utility(self, pickup_time, delivery_time, reward, r, h, h_):
-        if False and len(self.handle_list) <= 20:
-            return -STORE_COST[h.handle_type] * (pickup_time + delivery_time)
-        else:
-            h_: Handle
-            return (
-                reward #+ (SELL_PRICE[h_.handle_type-1] - BUY_PRICE[h_.handle_type-1])/len(h_.material_shortage)
-            ) / (pickup_time+2*delivery_time)
+        # if len(self.handle_list) >= 25:
+        #     h_type = h_.handle_type - 1
+        #     reward2 = (SELL_PRICE[h_type]-BUY_PRICE[h_type]) / len(h_.material_shortage)
+        #     return (reward) / (pickup_time+delivery_time)
+        # else:
+            return (reward) / (pickup_time+delivery_time
+                            #    +distance_to_time(get_distance(h_.x,MAP_SIZE/2,h_.y,MAP_SIZE/2))
+                               )
 
     def set_robots_targets(self):
         feasible_pickup_edges = {r:{} for r in self.robot_list}
@@ -451,9 +452,11 @@ class Map:
                         )
             if len(feasible_delivery_edges[h]) != 0:
                 for r in self.robot_list:
+                    if h.left_time/FPS - distance_to_time(get_object_distance(h, r)) >= 5:
+                        continue
                     feasible_pickup_edges[r][h] = (
                         -BUY_PRICE[h.handle_type-1], 
-                        max(distance_to_time(get_object_distance(h, r)), h.left_time)
+                        max(distance_to_time(get_object_distance(h, r)), h.left_time/FPS)
                     )
         
 
@@ -471,6 +474,8 @@ class Map:
                     for h, pickup_edge_info in feasible_pickup_edges[r].items():
                         pickup_time = pickup_edge_info[1]
                         for h_, delivery_edge_info in feasible_delivery_edges[h].items():
+                            if h.handle_type not in h_.material_shortage:
+                                continue
                             delivery_time = delivery_edge_info[1]
                             reward = delivery_edge_info[2]
                             if pickup_time + delivery_time >= left_frame / FPS * 0.8:
@@ -482,36 +487,20 @@ class Map:
                                 utility = u
                     h = hbest
                     h_ = h_best
-                    
                     if not(h is None or h_ is None):
                         r.add_task(h.x, h.y, BUY, self.frame)
                         h.is_assigned_pickup = 1
                         r.add_task(h_.x, h_.y, SELL, self.frame)
                         #防止同时操作导致找不到要清除的元素
-                        if h.handle_type not in h_.material_shortage:
-                            raise KeyError(h_.id, r.id, self.robot_list[0], h.id, h.handle_type, h_.material_shortage)
-                        h_.material_shortage.remove(h.handle_type)
+                        if h.handle_type in h_.material_shortage:
+                            h_.material_shortage.remove(h.handle_type)
                         h_.material_onroute[h.handle_type - 1] += 1
-                        for h__ in self.handle_type_dict[h.handle_type]:
-                            if h__ in feasible_delivery_edges:
-                                try:
-                                    feasible_delivery_edges[h__].pop(h_)
-                                except: pass
+                        feasible_delivery_edges[h].pop(h_)
                         if len(feasible_delivery_edges) == 0:
                             for r_ in self.robot_list:
                                 feasible_pickup_edges[r_].pop(h)
                     else:
                         r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
-                    # type_list = list(self.get_short_material())
-                    # for t in random.sample(type_list, len(type_list)):
-                    #     for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
-                    #         h: Handle
-                    #         if h.object == 1 and h.is_assigned_pickup == 0:
-                    #             r.add_task(h.x, h.y, 2, self.frame)
-                    #             h.is_assigned_pickup = 1
-                    #             break
-                    #     if r.is_assigned_task == 1:
-                    #         break
                 else:
                     for t in random.sample(MATERIAL_TYPE[r.object_type],
                                            len(MATERIAL_TYPE[r.object_type])):
@@ -527,4 +516,3 @@ class Map:
                             break
                     if r.is_assigned_task == 0:
                         r.add_task(r.x, r.y, 4, self.frame)
-                        # print_to_txt("no where to go")
