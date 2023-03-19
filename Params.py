@@ -32,6 +32,7 @@ BUY = 2
 SELL = 3
 DESTROY = 4
 GOTO = 5
+WAIT = 6
 
 
 
@@ -45,6 +46,10 @@ STORE_COST = STORE_COST + np.array([
     (STORE_COST[0]+STORE_COST[1]),
     (STORE_COST[0]+STORE_COST[2]),
     (STORE_COST[1]+STORE_COST[2]),
+    0,0,0
+])
+STORE_COST = STORE_COST + np.array([
+    0, 0, 0, 0, 0, 0,
     (STORE_COST[3]+STORE_COST[4]+STORE_COST[5]),
     0,0
 ])
@@ -71,4 +76,6 @@ MATERIAL_TYPE = {
     5: [7,9],
     6: [7,9],
     7: [8,9],
+    8: [],
+    9: []
 }

@@ -17,6 +17,14 @@ def print_to_txt(string: str):
 def get_distance(x1, x2, y1, y2):
     return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
+def get_object_distance(h, h_):
+    return get_distance(h.x, h_.x, h.y, h_.y)
+
+def distance_to_time(distance, speed=MAX_FORE_SPEED*0.98):
+    return distance / speed
+
+def distance_to_frame(distance, speed=MAX_FORE_SPEED*0.98):
+    return distance_to_time(distance, speed) * FPS
 
 def get_theta(x1, x2, y1, y2):
     if x2 - x1 > 0:
@@ -82,6 +90,15 @@ def is_boundary(x, y, direction):
         return True
     return False
 
+#计算价值系数
+def cal_value_coeff(x, maxX, minR):
+    if x >= maxX: return minR
+    else:
+        return minR + (1-minR) * (
+            1-np.sqrt(
+            1-(1-x/maxX)**2
+            )
+        )
 
 # 这是一个名为Handle的类，它代表了一个可操作的物体，包含一些属性和方法：
 
@@ -130,8 +147,7 @@ class Handle:
         material_info = "{:08b}".format(self.material)
         self.material_shortage = []
         for m in TYPE_MATERIAL[self.handle_type]:
-            if int(material_info[HANDLE_OBJECT_NUM -
-                                 m]) + self.material_onroute[m - 1] == 0:
+            if int(material_info[HANDLE_OBJECT_NUM - m]) + self.material_onroute[m - 1] == 0:
                 self.material_shortage.append(m)
 
 
@@ -185,9 +201,10 @@ class Robot:
         self.task_list = []
         self.strategy_dict = {}
         self.last_assigned_time = 0
-        self.last_assigned_time
         #用来判断机器人是否处在避让状态
         self.is_avoid = False
+
+        self.left_time_for_tasks = 0
 
     def update(self, handle, object_type, time_coeff, crash_coeff,
                rotate_speed, speed_x, speed_y, direction, x, y):
@@ -201,6 +218,11 @@ class Robot:
         self.direction = direction
         self.x = x
         self.y = y
+        self.left_time_for_tasks = 0
+        for x_,y_,_ in self.task_list:
+            self.left_time_for_tasks += get_distance(x, x_, y, y_)
+            x = x_
+            y = y_
 
     def add_task(self, x, y, todo_type, frame):
         if todo_type in [BUY, SELL]:
@@ -255,6 +277,8 @@ class Robot:
 
     def arrive(self):
         if self.todo_type == BUY:
+            if self.handle.object != 1:
+                return WAIT
             self.handle.is_assigned_pickup = 0
         elif self.todo_type == SELL:
             self.handle.material_onroute[self.object_type - 1] -= 1
@@ -398,70 +422,84 @@ class Map:
             h: Handle
             short_material = short_material.union(h.material_shortage)
         return short_material
+    
+    def cal_pickup_and_delivery_utility(self, pickup_time, delivery_time, reward, r, h, h_):
+        if False and len(self.handle_list) <= 20:
+            return -STORE_COST[h.handle_type] * (pickup_time + delivery_time)
+        else:
+            h_: Handle
+            return (
+                reward #+ (SELL_PRICE[h_.handle_type-1] - BUY_PRICE[h_.handle_type-1])/len(h_.material_shortage)
+            ) / (pickup_time+2*delivery_time)
 
     def set_robots_targets(self):
-        pickup_tasks = [[] for i in range(HANDLE_OBJECT_NUM)]
-        delivery_tasks = {}
-        delivery_edges = {}
+        feasible_pickup_edges = {r:{} for r in self.robot_list}
+        feasible_delivery_edges = {h:{} for h in self.handle_list}
         for h in self.handle_list:
             h: Handle
-            if h.object == 1 and h.is_assigned_pickup == 0:
-                pickup_tasks[h.handle_type - 1].append(h)
-        for h in self.handle_list:
-            short_material = h.material_shortage
-            if len(short_material) > 0:
-                delivery_tasks[h.id] = []
-                delivery_tasks_h = delivery_tasks[h.id]
-                avg_revenue = (
-                    SELL_PRICE[h.handle_type - 1] -
-                    BUY_PRICE[h.handle_type - 1]) / len(short_material)
-                for m in short_material:
-                    delivery_tasks_h.append(m)
-                    for h_ in pickup_tasks[m - 1]:
-                        delivery_edges.setdefault(h_, list()).append(
-                            (h, avg_revenue,
-                             get_distance(h_.x, h.x, h_.y, h.y)))
+            if h.handle_type > HANDLE_OBJECT_NUM or h.left_time < 0 or h.is_assigned_pickup == 1:
+                continue
+            for h__type_id in MATERIAL_TYPE[h.handle_type]:
+                h__list = self.handle_type_dict[h__type_id]
+                for h_ in h__list:
+                    h_: Handle
+                    if h.handle_type in h_.material_shortage:
+                        feasible_delivery_edges[h][h_] = (
+                            SELL_PRICE[h.handle_type-1], distance_to_time(get_object_distance(h, h_)),
+                            SELL_PRICE[h.handle_type-1]*cal_value_coeff(distance_to_frame(get_object_distance(h, h_)), 9000, 0.8) - BUY_PRICE[h.handle_type-1] 
+                            # + (SELL_PRICE[h_.handle_type-1]-BUY_PRICE[h_.handle_type-1]) / len(h_.material_shortage)
+                        )
+            if len(feasible_delivery_edges[h]) != 0:
+                for r in self.robot_list:
+                    feasible_pickup_edges[r][h] = (
+                        -BUY_PRICE[h.handle_type-1], 
+                        max(distance_to_time(get_object_distance(h, r)), h.left_time)
+                    )
+        
 
-        delivery_origins = list(delivery_edges.keys())
+        left_frame = TOTAL_TIME * 60 * FPS - self.frame
+        left_max_distance = left_frame / FPS * MAX_FORE_SPEED
         for r in self.robot_list:
             r: Robot
             if r.is_assigned_task == 0:
                 if r.object_type == 0:
-                    if len(delivery_origins) <= 0:
+                    if len(feasible_pickup_edges[r]) <= 0:
                         continue
-                    left_frame = TOTAL_TIME * 60 * FPS - self.frame
-                    left_max_distance = left_frame / FPS * MAX_FORE_SPEED
-                    # if left_max_distance < MAP_SIZE * 2:
-                    #     r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
-                    #     continue
-                    distance_list = [
-                        get_distance(r.x, h_.x, r.y, h_.y) / MAX_FORE_SPEED *
-                        STORE_COST[h_.handle_type - 1]
-                        for h_ in delivery_origins
-                    ]
-                    h_idx = np.argmin(distance_list)
-                    h = delivery_origins[h_idx]
-
-                    revenue_list = [
-                        -(i[1] - i[2] / MAX_FORE_SPEED *
-                          STORE_COST[i[0].handle_type - 1])
-                        for i in delivery_edges[h]
-                    ]
-                    for h__idx in np.argsort(revenue_list):
-                        h_: Handle = delivery_edges[h][h__idx][0]
-                        if h.handle_type in h_.material_shortage:
-                            break
-                    if get_distance(r.x, h.x, r.y, h.y) + get_distance(
-                            h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
-                        r.add_task(h.x, h.y, 2, self.frame)
+                    utility = -BIG_M
+                    hbest = None
+                    h_best = None
+                    for h, pickup_edge_info in feasible_pickup_edges[r].items():
+                        pickup_time = pickup_edge_info[1]
+                        for h_, delivery_edge_info in feasible_delivery_edges[h].items():
+                            delivery_time = delivery_edge_info[1]
+                            reward = delivery_edge_info[2]
+                            if pickup_time + delivery_time >= left_frame / FPS * 0.8:
+                                continue
+                            u = self.cal_pickup_and_delivery_utility(pickup_time, delivery_time, reward, r, h, h_)
+                            if u > utility:
+                                hbest = h
+                                h_best = h_
+                                utility = u
+                    h = hbest
+                    h_ = h_best
+                    
+                    if not(h is None or h_ is None):
+                        r.add_task(h.x, h.y, BUY, self.frame)
                         h.is_assigned_pickup = 1
-                        delivery_origins.pop(h_idx)
                         r.add_task(h_.x, h_.y, SELL, self.frame)
                         #防止同时操作导致找不到要清除的元素
-                        if h.handle_type in h_.material_shortage:
-                            h_.material_shortage.remove(h.handle_type)
+                        if h.handle_type not in h_.material_shortage:
+                            raise KeyError(h_.id, r.id, self.robot_list[0], h.id, h.handle_type, h_.material_shortage)
+                        h_.material_shortage.remove(h.handle_type)
                         h_.material_onroute[h.handle_type - 1] += 1
-                        delivery_edges[h].pop(h__idx)
+                        for h__ in self.handle_type_dict[h.handle_type]:
+                            if h__ in feasible_delivery_edges:
+                                try:
+                                    feasible_delivery_edges[h__].pop(h_)
+                                except: pass
+                        if len(feasible_delivery_edges) == 0:
+                            for r_ in self.robot_list:
+                                feasible_pickup_edges[r_].pop(h)
                     else:
                         r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
                     # type_list = list(self.get_short_material())
