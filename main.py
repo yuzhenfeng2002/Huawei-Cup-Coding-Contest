@@ -52,6 +52,8 @@ if __name__ == '__main__':
             sys.stdout.write(m.output_strategy2())
         elif m.choose == 3:
             sys.stdout.write(m.output_strategy3())
+        elif m.choose == 4:
+            sys.stdout.write(m.output_strategy4())
         else:
             sys.stdout.write(m.output_strategy())
         finish()

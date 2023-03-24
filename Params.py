@@ -2,15 +2,11 @@ import numpy as np
 
 RAND_SEED = 42
 
-
-
 TOTAL_TIME = 3
 MAP_SIZE = 50
 ROBO_NUM = 4
 FPS = 50
 INIT_MONEY = 200000
-
-
 
 ROBO_HANDLE_DIST = 0.4
 ROBO_RADIUS_NORM = 0.45
@@ -24,8 +20,6 @@ MAX_ROTATE_SPEED = 3.1415926
 MAX_TRACTION = 250
 MAX_MOMENT = 50
 
-
-
 FORWARD = 0
 ROTATE = 1
 BUY = 2
@@ -33,42 +27,35 @@ SELL = 3
 DESTROY = 4
 GOTO = 5
 
-
-
 BIG_M = 1e6
-BUY_PRICE = np.array([30,44,58,154,172,192,760,0,0])*100
-SELL_PRICE = np.array([60,76,92,225,250,275,1050,BIG_M,BIG_M])*100
-PRODUCE_TIME = np.array([50,50,50,500,500,500,1000,1,1]) / FPS
+BUY_PRICE = np.array([30, 44, 58, 154, 172, 192, 760, 0, 0]) * 100
+SELL_PRICE = np.array([60, 76, 92, 225, 250, 275, 1050, BIG_M, BIG_M]) * 100
+PRODUCE_TIME = np.array([50, 50, 50, 500, 500, 500, 1000, 1, 1]) / FPS
 STORE_COST = (SELL_PRICE - BUY_PRICE) / PRODUCE_TIME
 STORE_COST = STORE_COST + np.array([
-    0, 0, 0,
-    (STORE_COST[0]+STORE_COST[1]),
-    (STORE_COST[0]+STORE_COST[2]),
-    (STORE_COST[1]+STORE_COST[2]),
-    (STORE_COST[3]+STORE_COST[4]+STORE_COST[5]),
-    0,0
+    0, 0, 0, (STORE_COST[0] + STORE_COST[1]), (STORE_COST[0] + STORE_COST[2]),
+    (STORE_COST[1] + STORE_COST[2]),
+    (STORE_COST[3] + STORE_COST[4] + STORE_COST[5]), 0, 0
 ])
-
-
 
 TYPE_MATERIAL = {
     1: [],
     2: [],
     3: [],
-    4: [1,2],
-    5: [1,3],
-    6: [2,3],
-    7: [4,5,6],
+    4: [1, 2],
+    5: [1, 3],
+    6: [2, 3],
+    7: [4, 5, 6],
     8: [7],
-    9: [i for i in range(1,8)]
+    9: [i for i in range(1, 8)]
 }
 
 MATERIAL_TYPE = {
-    1: [4,5,9],
-    2: [4,6,9],
-    3: [5,6,9],
-    4: [7,9],
-    5: [7,9],
-    6: [7,9],
-    7: [8,9],
+    1: [4, 5, 9],
+    2: [4, 6, 9],
+    3: [5, 6, 9],
+    4: [7, 9],
+    5: [7, 9],
+    6: [7, 9],
+    7: [8, 9],
 }
