@@ -943,7 +943,7 @@ class Map:
             short_material = short_material.union(h.material_shortage)
         return short_material
 
-    def set_robots_targets(self):
+    def set_robots_targets1(self):
         pickup_tasks = [[] for i in range(HANDLE_OBJECT_NUM)]
         delivery_tasks = {}
         delivery_edges = {}
@@ -987,6 +987,85 @@ class Map:
 
                     revenue_list = [
                         -(i[1] / PRODUCE_TIME[i[0].handle_type-1] * i[2] / MAX_FORE_SPEED) # 1
+                        for i in delivery_edges[h]
+                    ]
+                    for h__idx in np.argsort(revenue_list):
+                        h_: Handle = delivery_edges[h][h__idx][0]
+                        if h.handle_type in h_.material_shortage:
+                            break
+                    if get_distance(r.x, h.x, r.y, h.y) + get_distance(h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
+                        r.add_task(h.x, h.y, BUY, self.frame)
+                        h.is_assigned_pickup = 1
+                        delivery_origins.pop(h_idx)
+                        r.add_task(h_.x, h_.y, SELL, self.frame)
+                        #防止同时操作导致找不到要清除的元素
+                        if h.handle_type in h_.material_shortage:
+                            h_.material_shortage.remove(h.handle_type)
+                        h_.material_onroute[h.handle_type - 1] += 1
+                        delivery_edges[h].pop(h__idx)
+                    else:
+                        r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
+                else:
+                    for t in random.sample(MATERIAL_TYPE[r.object_type],
+                                           len(MATERIAL_TYPE[r.object_type])):
+                        for h in random.sample(self.handle_type_dict[t],
+                                               len(self.handle_type_dict[t])):
+                            h: Handle
+                            if r.object_type in h.material_shortage:
+                                r.add_task(h.x, h.y, 3, self.frame)
+                                h.material_shortage.remove(r.object_type)
+                                h.material_onroute[r.object_type - 1] += 1
+                                break
+                        if r.is_assigned_task == 1:
+                            break
+                    if r.is_assigned_task == 0:
+                        r.add_task(r.x, r.y, DESTROY, self.frame)
+                        # print_to_txt("no where to go")
+
+    def set_robots_targets(self):
+        pickup_tasks = [[] for i in range(HANDLE_OBJECT_NUM)]
+        delivery_tasks = {}
+        delivery_edges = {}
+        for h in self.handle_list:
+            if h.handle_type > HANDLE_OBJECT_NUM: continue
+            if ((h.object == 1 or (0 <= h.left_time <= (MAP_SIZE * 2) / MAX_FORE_SPEED * FPS * 0.9)) and h.is_assigned_pickup == 0): # or (h.left_time > 0 and PRODUCE_TIME[h.handle_type-1] <= FPS):
+                if h.object == 1: h.left_time = 0
+                pickup_tasks[h.handle_type - 1].append(h)
+        for h in self.handle_list:
+            short_material = h.material_shortage
+            if len(short_material) > 0:
+                delivery_tasks[h.id] = []
+                delivery_tasks_h = delivery_tasks[h.id]
+                short_material_num = len(short_material)
+                avg_revenue = (
+                    SELL_PRICE[h.handle_type - 1] -
+                    BUY_PRICE[h.handle_type - 1]) / len(short_material)
+                for m in short_material:
+                    delivery_tasks_h.append(m)
+                    for h_ in pickup_tasks[m - 1]:
+                        delivery_edges.setdefault(h_, list()).append(
+                            (h, avg_revenue, get_distance(h_.x, h.x, h_.y, h.y), short_material_num))
+
+        delivery_origins = list(delivery_edges.keys())
+        left_frame = TOTAL_TIME * 60 * FPS - self.frame
+        left_max_distance = left_frame / FPS * MAX_FORE_SPEED
+        for r in self.robot_list:
+            r: Robot
+            if r.is_assigned_task == 0:
+                if r.object_type == 0:
+                    if len(delivery_origins) <= 0:
+                        continue
+                    distance_list = [
+                        max(get_distance(r.x, h_.x, r.y, h_.y) / MAX_FORE_SPEED,
+                            h_.left_time / FPS) *
+                        STORE_COST[h_.handle_type - 1]
+                        for h_ in delivery_origins
+                    ]
+                    h_idx = np.argmin(distance_list)
+                    h = delivery_origins[h_idx]
+
+                    revenue_list = [
+                        -(i[1] - i[2] / MAX_FORE_SPEED * STORE_COST[i[0].handle_type - 1]) # 2
                         for i in delivery_edges[h]
                     ]
                     for h__idx in np.argsort(revenue_list):
