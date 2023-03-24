@@ -45,7 +45,10 @@ if __name__ == '__main__':
             m.update_handle_type_dict_first()
         read_util_ok()
 
-        m.set_robots_targets()
+        if m.map_type == 1:
+            m.set_robots_targets1()
+        else:
+            m.set_robots_targets()
 
         sys.stdout.write('%d\n' % frame)
         if m.choose == 2:
