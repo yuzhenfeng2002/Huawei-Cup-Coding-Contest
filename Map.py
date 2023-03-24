@@ -10,6 +10,7 @@ random.seed(RAND_SEED)
 # get_theta(x1, x2, y1, y2): 这个函数用于计算两点之间的极角（弧度制），输入参数是两个点的坐标。
 # get_angle(_theta, theta): 这个函数用于计算角度差，即第二个角度减去第一个角度后的差值，其中输入参数是两个弧度制的角度。如果角度差值在一定范围内，则将其视为0，否则按照正负值返回差值的绝对值。
 def print_to_txt(string: str):
+    pass
     with open("./log.txt", "a") as f:
         f.write(str(string) + '\n')
 
@@ -463,6 +464,8 @@ class Robot:
 
     def arrive(self):
         if self.todo_type == BUY:
+            if self.handle.object != 1:
+                return WAIT
             self.handle.is_assigned_pickup = 0
         elif self.todo_type == SELL:
             self.handle.material_onroute[self.object_type - 1] -= 1
@@ -509,6 +512,7 @@ class Map:
         self.handle_list = []
         self.handle_type_dict = {}
         self.choose = 4
+        self.map_type = 1
 
     def update_map(self, frame, money):
         self.frame = frame
@@ -521,12 +525,16 @@ class Map:
     def init_handles(self, num):
         if num == 43:  #4
             self.choose = 4
+            self.map_type = 1
         if num == 50:  #4
             self.choose = 4
+            self.map_type = 3
         if num == 25:  #2
             self.choose = 2
+            self.map_type = 2
         if num == 18:  #3
             self.choose = 3
+            self.map_type = 4
         for i in range(num):
             self.handle_list.append(Handle(id=i))
 
@@ -940,14 +948,16 @@ class Map:
         delivery_tasks = {}
         delivery_edges = {}
         for h in self.handle_list:
-            h: Handle
-            if h.object == 1 and h.is_assigned_pickup == 0:
+            if h.handle_type > HANDLE_OBJECT_NUM: continue
+            if ((h.object == 1 or (0 <= h.left_time <= (MAP_SIZE * 2) / MAX_FORE_SPEED * FPS * 0.9)) and h.is_assigned_pickup == 0):# or (h.left_time > 0 and PRODUCE_TIME[h.handle_type-1] <= FPS):
+                if h.object == 1: h.left_time = 0
                 pickup_tasks[h.handle_type - 1].append(h)
         for h in self.handle_list:
             short_material = h.material_shortage
             if len(short_material) > 0:
                 delivery_tasks[h.id] = []
                 delivery_tasks_h = delivery_tasks[h.id]
+                short_material_num = len(short_material)
                 avg_revenue = (
                     SELL_PRICE[h.handle_type - 1] -
                     BUY_PRICE[h.handle_type - 1]) / len(short_material)
@@ -955,23 +965,20 @@ class Map:
                     delivery_tasks_h.append(m)
                     for h_ in pickup_tasks[m - 1]:
                         delivery_edges.setdefault(h_, list()).append(
-                            (h, avg_revenue,
-                             get_distance(h_.x, h.x, h_.y, h.y)))
+                            (h, avg_revenue, get_distance(h_.x, h.x, h_.y, h.y), short_material_num))
 
         delivery_origins = list(delivery_edges.keys())
+        left_frame = TOTAL_TIME * 60 * FPS - self.frame
+        left_max_distance = left_frame / FPS * MAX_FORE_SPEED
         for r in self.robot_list:
             r: Robot
             if r.is_assigned_task == 0:
                 if r.object_type == 0:
                     if len(delivery_origins) <= 0:
                         continue
-                    left_frame = TOTAL_TIME * 60 * FPS - self.frame
-                    left_max_distance = left_frame / FPS * MAX_FORE_SPEED
-                    # if left_max_distance < MAP_SIZE * 2:
-                    #     r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
-                    #     continue
                     distance_list = [
-                        get_distance(r.x, h_.x, r.y, h_.y) / MAX_FORE_SPEED *
+                        max(get_distance(r.x, h_.x, r.y, h_.y) / MAX_FORE_SPEED,
+                            h_.left_time / FPS) *
                         STORE_COST[h_.handle_type - 1]
                         for h_ in delivery_origins
                     ]
@@ -979,16 +986,14 @@ class Map:
                     h = delivery_origins[h_idx]
 
                     revenue_list = [
-                        -(i[1] - i[2] / MAX_FORE_SPEED *
-                          STORE_COST[i[0].handle_type - 1])
+                        -(i[1] / PRODUCE_TIME[i[0].handle_type-1] * i[2] / MAX_FORE_SPEED) # 1
                         for i in delivery_edges[h]
                     ]
                     for h__idx in np.argsort(revenue_list):
                         h_: Handle = delivery_edges[h][h__idx][0]
                         if h.handle_type in h_.material_shortage:
                             break
-                    if get_distance(r.x, h.x, r.y, h.y) + get_distance(
-                            h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
+                    if get_distance(r.x, h.x, r.y, h.y) + get_distance(h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
                         r.add_task(h.x, h.y, BUY, self.frame)
                         h.is_assigned_pickup = 1
                         delivery_origins.pop(h_idx)
@@ -1000,16 +1005,6 @@ class Map:
                         delivery_edges[h].pop(h__idx)
                     else:
                         r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
-                    # type_list = list(self.get_short_material())
-                    # for t in random.sample(type_list, len(type_list)):
-                    #     for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
-                    #         h: Handle
-                    #         if h.object == 1 and h.is_assigned_pickup == 0:
-                    #             r.add_task(h.x, h.y, 2, self.frame)
-                    #             h.is_assigned_pickup = 1
-                    #             break
-                    #     if r.is_assigned_task == 1:
-                    #         break
                 else:
                     for t in random.sample(MATERIAL_TYPE[r.object_type],
                                            len(MATERIAL_TYPE[r.object_type])):
