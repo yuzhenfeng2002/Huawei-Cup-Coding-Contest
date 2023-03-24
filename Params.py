@@ -30,7 +30,7 @@ WAIT = 6
 
 BIG_M = 1e6
 BUY_PRICE = np.array([30, 44, 58, 154, 172, 192, 760, 0, 0]) * 100
-SELL_PRICE = np.array([60, 76, 92, 225, 250, 275, 1050, 0, 0]) * 100
+SELL_PRICE = np.array([60, 76, 92, 225, 250, 275, 1050, BIG_M, BIG_M]) * 100
 PRODUCE_TIME = np.array([50, 50, 50, 500, 500, 500, 1000, 1, 1]) / FPS
 STORE_COST = (SELL_PRICE - BUY_PRICE) / PRODUCE_TIME
 STORE_COST = STORE_COST + np.array([

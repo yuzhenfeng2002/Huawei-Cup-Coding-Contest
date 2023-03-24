@@ -958,7 +958,8 @@ class Map:
                 delivery_tasks[h.id] = []
                 delivery_tasks_h = delivery_tasks[h.id]
                 short_material_num = len(short_material)
-                avg_revenue = (
+                if h.handle_type > HANDLE_OBJECT_NUM: avg_revenue = 0
+                else: avg_revenue = (
                     SELL_PRICE[h.handle_type - 1] -
                     BUY_PRICE[h.handle_type - 1]) / len(short_material)
                 for m in short_material:
