@@ -429,9 +429,7 @@ class Map:
         #     reward2 = (SELL_PRICE[h_type]-BUY_PRICE[h_type]) / len(h_.material_shortage)
         #     return (reward) / (pickup_time+delivery_time)
         # else:
-            return (reward) / (pickup_time+delivery_time
-                            #    +distance_to_time(get_distance(h_.x,MAP_SIZE/2,h_.y,MAP_SIZE/2))
-                               )
+            return - STORE_COST[h_.handle_type-1] * (pickup_time+delivery_time) / len(h_.material_shortage)
 
     def set_robots_targets(self):
         feasible_pickup_edges = {r:{} for r in self.robot_list}
@@ -458,6 +456,8 @@ class Map:
                         -BUY_PRICE[h.handle_type-1], 
                         max(distance_to_time(get_object_distance(h, r)), h.left_time/FPS)
                     )
+            else:
+                feasible_delivery_edges.pop(h)
         
 
         left_frame = TOTAL_TIME * 60 * FPS - self.frame
@@ -468,7 +468,7 @@ class Map:
                 if r.object_type == 0:
                     if len(feasible_pickup_edges[r]) <= 0:
                         continue
-                    utility = -BIG_M
+                    utility = -np.inf
                     hbest = None
                     h_best = None
                     for h, pickup_edge_info in feasible_pickup_edges[r].items():
@@ -481,6 +481,7 @@ class Map:
                             if pickup_time + delivery_time >= left_frame / FPS * 0.8:
                                 continue
                             u = self.cal_pickup_and_delivery_utility(pickup_time, delivery_time, reward, r, h, h_)
+
                             if u > utility:
                                 hbest = h
                                 h_best = h_
@@ -500,7 +501,13 @@ class Map:
                             for r_ in self.robot_list:
                                 feasible_pickup_edges[r_].pop(h)
                     else:
-                        r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
+                        r.add_task(r.x, r.y, GOTO, self.frame)
+                        if left_max_distance <= MAP_SIZE * 2:
+                        # print_to_txt((feasible_pickup_edges[r], feasible_delivery_edges))
+                            if r.id == 0: r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
+                            if r.id == 1: r.add_task(0, MAP_SIZE, GOTO, self.frame)
+                            if r.id == 2: r.add_task(MAP_SIZE, 0, GOTO, self.frame)
+                            if r.id == 3: r.add_task(0, 0, GOTO, self.frame)
                 else:
                     for t in random.sample(MATERIAL_TYPE[r.object_type],
                                            len(MATERIAL_TYPE[r.object_type])):
