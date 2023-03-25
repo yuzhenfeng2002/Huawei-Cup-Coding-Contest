@@ -581,14 +581,14 @@ class Map:
             self.robot_list.append(Robot(id=i))
 
     def init_handles(self, num):
-        if num == 43:  #1
-            self.choose = 1
-            self.map_type = 1
-        if num == 50:  #4
+        if num == 43:  #4
             self.choose = 4
+            self.map_type = 1
+        if num == 50:  #1
+            self.choose = 1
             self.map_type = 3
-        if num == 25:  #2
-            self.choose = 2
+        if num == 25:  #1
+            self.choose = 1
             self.map_type = 2
         if num == 18:  #3
             self.choose = 3
@@ -644,7 +644,7 @@ class Map:
         outputs = ""
         for r in self.robot_list:
             r.is_avoid = False
-            r.strategy3()
+            r.strategy4()
         #用人工势场方法进行防撞修正
         for i in range(ROBO_NUM):
             r: Robot = self.robot_list[i]
@@ -652,23 +652,23 @@ class Map:
             robot_force_x = 0
             robot_force_y = 0
             #计算到目标点的引力
-            aforce_x, aforce_y = 0, 0
+            aforce_x, aforce_y = r.attractive_force2()
             #计算到其他机器人的斥力
             for j in range(ROBO_NUM):
                 if i != j:
                     r_: Robot = self.robot_list[j]
                     distance = get_distance(r.x, r_.x, r.y, r_.y)
                     if distance < 1.8 * ROBO_RADIUS_FULL * r.get_speed(
-                    ) / 6 + 2:
+                    ) / 6 + 6 * ROBO_RADIUS_FULL:
                         #计算到其他机器人的斥力
                         dx = r.x - r_.x
                         dy = r.y - r_.y
                         robot_force_x += dx / distance * (
-                            24 * ROBO_RADIUS_FULL / distance -
-                            5 * ROBO_RADIUS_FULL)
+                            15 * ROBO_RADIUS_FULL / distance -
+                            2 * ROBO_RADIUS_FULL)
                         robot_force_y += dy / distance * (
-                            24 * ROBO_RADIUS_FULL / distance -
-                            5 * ROBO_RADIUS_FULL)
+                            15 * ROBO_RADIUS_FULL / distance -
+                            2 * ROBO_RADIUS_FULL)
             #计算边界对机器人的斥力
             # Boundaty = 3
             # if r.x < Boundaty:
@@ -694,20 +694,20 @@ class Map:
                 cross = -np.cross(force, dir1)
                 # print_to_txt("angle:" + str(angle) + " " + str(cross))
                 force
-                if angle > np.pi * 0.8:
+                if angle > np.pi * 0.75:
                     if force_val > 3:
                         if r.object_type:
                             r.set_speed(r.get_speed() - force_val / 20)
                         else:
-                            r.set_speed(r.get_speed() - force_val / 30)
+                            r.set_speed(r.get_speed() - force_val / 20)
                     if cross > 0:
                         r.set_rotate(r.rotate_speed + force_val * angle / 30)
                     # print_to_txt("set " + str(r.id) + " 1")
                     if cross <= 0:
                         r.set_rotate(r.rotate_speed - force_val * angle / 30)
-                elif angle < np.pi * 0.3:
+                elif angle < np.pi * 0.25:
                     if force_val > 3:
-                        r.set_speed(r.get_speed() + force_val / 20)
+                        r.set_speed(r.get_speed() + force_val / 18)
                 else:
                     if cross > 0:
                         r.set_rotate(r.rotate_speed + cross / 20)
@@ -897,7 +897,7 @@ class Map:
         outputs = ""
         for r in self.robot_list:
             r.is_avoid = False
-            r.strategy4()
+            r.strategy3()
         #用人工势场方法进行防撞修正
         for i in range(ROBO_NUM):
             r: Robot = self.robot_list[i]
@@ -912,16 +912,16 @@ class Map:
                     r_: Robot = self.robot_list[j]
                     distance = get_distance(r.x, r_.x, r.y, r_.y)
                     if distance < 1.8 * ROBO_RADIUS_FULL * r.get_speed(
-                    ) / 6 + 2.5:
+                    ) / 6 + 4 * ROBO_RADIUS_FULL:
                         #计算到其他机器人的斥力
                         dx = r.x - r_.x
                         dy = r.y - r_.y
                         robot_force_x += dx / distance * (
-                            24 * ROBO_RADIUS_FULL / distance -
-                            5 * ROBO_RADIUS_FULL)
+                            15 * ROBO_RADIUS_FULL / distance -
+                            2 * ROBO_RADIUS_FULL)
                         robot_force_y += dy / distance * (
-                            24 * ROBO_RADIUS_FULL / distance -
-                            5 * ROBO_RADIUS_FULL)
+                            15 * ROBO_RADIUS_FULL / distance -
+                            2 * ROBO_RADIUS_FULL)
             #计算边界对机器人的斥力
             # Boundaty = 3
             # if r.x < Boundaty:
