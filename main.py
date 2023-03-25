@@ -47,6 +47,8 @@ if __name__ == '__main__':
 
         if m.map_type == 1:
             m.set_robots_targets1()
+        elif m.map_type == 2:
+            m.set_robots_targets2()
         else:
             m.set_robots_targets()
 

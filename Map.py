@@ -1023,13 +1023,14 @@ class Map:
                         r.add_task(r.x, r.y, DESTROY, self.frame)
                         # print_to_txt("no where to go")
 
-    def set_robots_targets(self):
+    def set_robots_targets2(self):
         pickup_tasks = [[] for i in range(HANDLE_OBJECT_NUM)]
+        avg_profit_type = [np.array([0.0, 0, 0]) for i in range(HANDLE_OBJECT_NUM)]
         delivery_tasks = {}
         delivery_edges = {}
         for h in self.handle_list:
             if h.handle_type > HANDLE_OBJECT_NUM: continue
-            if ((h.object == 1 or (0 <= h.left_time <= (MAP_SIZE * 2) / MAX_FORE_SPEED * FPS * 0.9)) and h.is_assigned_pickup == 0): # or (h.left_time > 0 and PRODUCE_TIME[h.handle_type-1] <= FPS):
+            if ((h.object == 1 or (0 <= h.left_time <= (MAP_SIZE * 2) / MAX_FORE_SPEED * FPS * 0.1)) and h.is_assigned_pickup == 0): # or (h.left_time > 0 and PRODUCE_TIME[h.handle_type-1] <= FPS):
                 if h.object == 1: h.left_time = 0
                 pickup_tasks[h.handle_type - 1].append(h)
         for h in self.handle_list:
@@ -1038,10 +1039,17 @@ class Map:
                 delivery_tasks[h.id] = []
                 delivery_tasks_h = delivery_tasks[h.id]
                 short_material_num = len(short_material)
-                avg_revenue = (
-                    SELL_PRICE[h.handle_type - 1] -
-                    BUY_PRICE[h.handle_type - 1]) / len(short_material)
+                if h.left_time == 0: avg_revenue = 0
+                elif h.left_time == -1:
+                    avg_revenue = (
+                        SELL_PRICE[h.handle_type - 1] -
+                        BUY_PRICE[h.handle_type - 1]) / len(short_material)
+                elif h.left_time > 0:
+                    avg_revenue = (
+                        SELL_PRICE[h.handle_type - 1] -
+                        BUY_PRICE[h.handle_type - 1]) / len(short_material) / 2
                 for m in short_material:
+                    avg_profit_type[m-1] += np.array([avg_revenue, PRODUCE_TIME[h.handle_type - 1], 1])
                     delivery_tasks_h.append(m)
                     for h_ in pickup_tasks[m - 1]:
                         delivery_edges.setdefault(h_, list()).append(
@@ -1057,12 +1065,10 @@ class Map:
                     if len(delivery_origins) <= 0:
                         continue
                     distance_list = [
-                        max(get_distance(r.x, h_.x, r.y, h_.y) / MAX_FORE_SPEED,
-                            h_.left_time / FPS) *
-                        STORE_COST[h_.handle_type - 1]
+                        avg_profit_type[h_.handle_type - 1][0] / max(get_distance(r.x, h_.x, r.y, h_.y) / MAX_FORE_SPEED, h_.left_time / FPS)  / avg_profit_type[h_.handle_type - 1][2]
                         for h_ in delivery_origins
                     ]
-                    h_idx = np.argmin(distance_list)
+                    h_idx = np.argmax(distance_list)
                     h = delivery_origins[h_idx]
 
                     revenue_list = [
