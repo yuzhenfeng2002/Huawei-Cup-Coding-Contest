@@ -119,6 +119,18 @@ def is_boundary(x, y, direction):
     return False
 
 
+def is_boundary2(x, y, direction):
+    if (x < 1 and (direction > np.pi * 0.7 or direction < -np.pi * 0.7)):
+        return True
+    if (x > 49 and direction < np.pi * 0.3 and direction > -np.pi * 0.3):
+        return True
+    if (y < 1 and (direction > -np.pi * 0.8 and direction < -np.pi * 0.2)):
+        return True
+    if (y > 49 and direction < np.pi * 0.8 and direction > np.pi * 0.2):
+        return True
+    return False
+
+
 def is_collide(distance, ty1, ty2):
     r1 = ROBO_RADIUS_NORM
     if ty1:
@@ -426,6 +438,42 @@ class Robot:
             ROTATE: np.sign(angle) * rotate_speed
         }
 
+    def strategy3(self):
+        self.strategy_dict = {}
+
+        if self.x_ is None or self.y_ is None:
+            stop_strategy = {FORWARD: 0, ROTATE: 0}
+            self.strategy_dict = stop_strategy
+            return
+
+        distance = get_distance(self.x, self.x_, self.y, self.y_)
+        if distance < ROBO_HANDLE_DIST:
+            stop_strategy = {FORWARD: 0, ROTATE: 0, self.arrive(): -1}
+            self.strategy_dict = stop_strategy
+            return
+
+        theta = get_theta(self.x, self.x_, self.y, self.y_)
+        angle = get_angle(self.direction, theta)
+
+        speed = min(distance / self.delta_time, MAX_FORE_SPEED)
+        if abs(angle) > np.pi / 2 - 0.1:
+            if distance < 6 * ROBO_HANDLE_DIST:
+                speed = 0
+                self.is_avoid = True
+            elif is_boundary2(self.x, self.y, self.direction):
+                speed = 0
+            else:
+                speed = 3
+        if distance < 5 * ROBO_HANDLE_DIST:
+            if abs(angle) > np.pi / 4:
+                speed = distance / 2 * ROBO_HANDLE_DIST
+                self.is_avoid = True
+        rotate_speed = min(abs(angle) / self.delta_time, MAX_ROTATE_SPEED)
+        self.strategy_dict = {
+            FORWARD: speed,
+            ROTATE: np.sign(angle) * rotate_speed
+        }
+
     def strategy4(self):
         self.strategy_dict = {}
 
@@ -523,14 +571,14 @@ class Map:
             self.robot_list.append(Robot(id=i))
 
     def init_handles(self, num):
-        if num == 43:  #4
-            self.choose = 4
+        if num == 43:  #1
+            self.choose = 1
             self.map_type = 1
         if num == 50:  #4
             self.choose = 4
             self.map_type = 3
-        if num == 25:  #2
-            self.choose = 2
+        if num == 25:  #1
+            self.choose = 1
             self.map_type = 2
         if num == 18:  #3
             self.choose = 3
@@ -585,9 +633,8 @@ class Map:
     def output_strategy(self):
         outputs = ""
         for r in self.robot_list:
-            r.is_colide = False
             r.is_avoid = False
-            r.strategy4()
+            r.strategy3()
         #用人工势场方法进行防撞修正
         for i in range(ROBO_NUM):
             r: Robot = self.robot_list[i]
@@ -595,100 +642,14 @@ class Map:
             robot_force_x = 0
             robot_force_y = 0
             #计算到目标点的引力
-            aforce_x, aforce_y = r.attractive_force()
-            #计算到其他机器人的斥力
-            for j in range(ROBO_NUM):
-                if i == j:
-                    continue
-                r_: Robot = self.robot_list[j]
-                distance = get_distance(r.x, r_.x, r.y, r_.y)
-                if distance < 3 * ROBO_RADIUS_FULL * (r.get_speed()) / 3 + 3:
-                    #计算到其他机器人的斥力
-                    dx = r.x - r_.x
-                    dy = r.y - r_.y
-                    robot_force_x += 10 * ROBO_RADIUS_FULL * dx / distance**3
-                    robot_force_y += 10 * ROBO_RADIUS_FULL * dy / distance**3
-                if distance < 2 * ROBO_RADIUS_FULL:
-                    r.is_colide = True
-            #计算合力向量，并根据现在机器人速度和合力夹角给出调整
-            # print_to_txt(
-            #     str(self.frame) + " id:" + str(r.id) + " force:" +
-            #     str(robot_force_x) + " " + str(robot_force_y))
-            force = np.array(
-                [robot_force_x + aforce_x, robot_force_y + aforce_y])
-            dir1 = np.array([np.cos(r.direction), np.sin(r.direction)])
-            # print_to_txt("dir " + str(dir1) + " " + str(r.direction))
-            F = np.linalg.norm(force)  #合力绝对值
-            if F > 2:
-                cos_angle = np.dot(force, dir1) / F
-                angle = np.arccos(cos_angle)
-                cross = -np.cross(force, dir1)
-                # print_to_txt("angle:" + str(angle) + " " + str(cross))
-                if r.is_colide:
-                    r.is_avoid = False
-                    if cross > 0:
-                        r.set_rotate(np.pi)
-                    else:
-                        r.set_rotate(-np.pi)
-                    continue
-                if angle > np.pi * 0.7:
-                    if F > 4:
-                        if r.object_type:
-                            r.is_avoid = False
-                            r.set_speed(r.get_speed() - F / 3)
-                        else:
-                            r.set_speed(r.get_speed() - F / 5)
-                    if cross > 0:
-                        r.set_rotate(r.rotate_speed + F / np.pi)
-                    if cross <= 0:
-                        r.set_rotate(r.rotate_speed - F / np.pi)
-                elif angle < np.pi * 0.25:
-                    if F > 3:
-                        if r.object_type:
-                            r.is_avoid = False
-                            r.set_speed(r.get_speed() + F / 3)
-                        else:
-                            r.set_speed(r.get_speed() + F / 4)
-                else:
-                    if cross > 0:
-                        r.set_rotate(r.rotate_speed + F / np.pi)
-                    if cross <= 0:
-                        r.set_rotate(r.rotate_speed - F / np.pi)
-            # elif np.linalg.norm(force) > 5:
-            #     if r.get_speed() < 4:
-            #         r.set_speed(r.get_speed() + 1)
-            # print_to_txt("set " + str(r.id) + " -1")
-
-        for r in self.robot_list:
-            #如果靠近边缘则限制最大速度
-            if is_boundary(r.x, r.y, r.direction) and r.get_speed() > 3:
-                r.set_speed(3)
-            output = self.strategy_to_str(r)
-            if output == "":
-                continue
-            outputs += output
-        return outputs
-
-    def output_strategy2(self):
-        outputs = ""
-        for r in self.robot_list:
-            r.is_avoid = False
-            r.strategy4()
-        #用人工势场方法进行防撞修正
-        for i in range(ROBO_NUM):
-            r: Robot = self.robot_list[i]
-            #计算合力
-            robot_force_x = 0
-            robot_force_y = 0
-            #计算到目标点的引力
-            aforce_x, aforce_y = r.attractive_force2()
+            aforce_x, aforce_y = 0, 0
             #计算到其他机器人的斥力
             for j in range(ROBO_NUM):
                 if i != j:
                     r_: Robot = self.robot_list[j]
                     distance = get_distance(r.x, r_.x, r.y, r_.y)
                     if distance < 1.8 * ROBO_RADIUS_FULL * r.get_speed(
-                    ) / 6 + 2.5:
+                    ) / 6 + 2:
                         #计算到其他机器人的斥力
                         dx = r.x - r_.x
                         dy = r.y - r_.y
@@ -717,7 +678,7 @@ class Map:
             dir1 = np.array([np.cos(r.direction), np.sin(r.direction)])
             # print_to_txt("dir " + str(dir1) + " " + str(r.direction))
             force_val = np.linalg.norm(force)
-            if force_val > 0.9:
+            if force_val > 1.1:
                 cos_angle = np.dot(force, dir1) / force_val
                 angle = np.arccos(cos_angle)
                 cross = -np.cross(force, dir1)
@@ -734,9 +695,98 @@ class Map:
                     # print_to_txt("set " + str(r.id) + " 1")
                     if cross <= 0:
                         r.set_rotate(r.rotate_speed - force_val * angle / 30)
-                elif angle < np.pi * 0.2:
+                elif angle < np.pi * 0.3:
                     if force_val > 3:
-                        r.set_speed(r.get_speed() + force_val / 18)
+                        r.set_speed(r.get_speed() + force_val / 20)
+                else:
+                    if cross > 0:
+                        r.set_rotate(r.rotate_speed + cross / 20)
+                    # print_to_txt("set " + str(r.id) + " 1")
+                    if cross < 0:
+                        r.set_rotate(r.rotate_speed + cross / 20)
+            # elif np.linalg.norm(force) > 5:
+            #     if r.get_speed() < 4:
+            #         r.set_speed(r.get_speed() + 1)
+            # print_to_txt("set " + str(r.id) + " -1")
+
+        for r in self.robot_list:
+            # 如果靠近边缘则限制最大速度
+            if is_boundary(r.x, r.y, r.direction) and r.get_speed() > 3:
+                r.set_speed(3)
+            output = self.strategy_to_str(r)
+            if output == "":
+                continue
+            outputs += output
+        return outputs
+
+    def output_strategy2(self):
+        outputs = ""
+        for r in self.robot_list:
+            r.is_avoid = False
+            r.strategy3()
+        #用人工势场方法进行防撞修正
+        for i in range(ROBO_NUM):
+            r: Robot = self.robot_list[i]
+            #计算合力
+            robot_force_x = 0
+            robot_force_y = 0
+            #计算到目标点的引力
+            aforce_x, aforce_y = 0, 0
+            #计算到其他机器人的斥力
+            for j in range(ROBO_NUM):
+                if i != j:
+                    r_: Robot = self.robot_list[j]
+                    distance = get_distance(r.x, r_.x, r.y, r_.y)
+                    if distance < 1.8 * ROBO_RADIUS_FULL * r.get_speed(
+                    ) / 6 + 2:
+                        #计算到其他机器人的斥力
+                        dx = r.x - r_.x
+                        dy = r.y - r_.y
+                        robot_force_x += dx / distance * (
+                            24 * ROBO_RADIUS_FULL / distance -
+                            5 * ROBO_RADIUS_FULL)
+                        robot_force_y += dy / distance * (
+                            24 * ROBO_RADIUS_FULL / distance -
+                            5 * ROBO_RADIUS_FULL)
+            #计算边界对机器人的斥力
+            # Boundaty = 3
+            # if r.x < Boundaty:
+            #     robot_force_x += 0.8
+            # if r.x > MAP_SIZE - Boundaty:
+            #     robot_force_x -= 0.8
+            # if r.y < Boundaty:
+            #     robot_force_y += 0.8
+            # if r.y > MAP_SIZE - Boundaty:
+            #     robot_force_y -= 0.8
+            #计算合力向量，并根据现在机器人速度和合力夹角给出调整
+            # print_to_txt(
+            #     str(self.frame) + " id:" + str(r.id) + " force:" +
+            #     str(robot_force_x) + " " + str(robot_force_y))
+            force = np.array(
+                [robot_force_x + aforce_x, robot_force_y + aforce_y])
+            dir1 = np.array([np.cos(r.direction), np.sin(r.direction)])
+            # print_to_txt("dir " + str(dir1) + " " + str(r.direction))
+            force_val = np.linalg.norm(force)
+            if force_val > 1.1:
+                cos_angle = np.dot(force, dir1) / force_val
+                angle = np.arccos(cos_angle)
+                cross = -np.cross(force, dir1)
+                # print_to_txt("angle:" + str(angle) + " " + str(cross))
+                force
+                if angle > np.pi * 0.8:
+                    if force_val > 3:
+                        if r.object_type:
+                            r.set_speed(r.get_speed() - force_val / 20)
+                        else:
+                            r.set_speed(r.get_speed() - force_val / 30)
+                    if cross > 0:
+                        r.set_rotate(r.rotate_speed + force_val * angle / 30)
+                    # print_to_txt("set " + str(r.id) + " 1")
+                    if cross <= 0:
+                        r.set_rotate(r.rotate_speed - force_val * angle / 30)
+                elif angle < np.pi * 0.3:
+                    if force_val > 3:
+                        r.set_speed(r.get_speed() + force_val / 20)
                 else:
                     if cross > 0:
                         r.set_rotate(r.rotate_speed + cross / 20)
@@ -949,7 +999,12 @@ class Map:
         delivery_edges = {}
         for h in self.handle_list:
             if h.handle_type > HANDLE_OBJECT_NUM: continue
-            if ((h.object == 1 or (0 <= h.left_time <= (MAP_SIZE * 2) / MAX_FORE_SPEED * FPS * 0.9)) and h.is_assigned_pickup == 0):# or (h.left_time > 0 and PRODUCE_TIME[h.handle_type-1] <= FPS):
+            if (
+                (h.object == 1 or
+                 (0 <= h.left_time <=
+                  (MAP_SIZE * 2) / MAX_FORE_SPEED * FPS * 0.9))
+                    and h.is_assigned_pickup == 0
+            ):  # or (h.left_time > 0 and PRODUCE_TIME[h.handle_type-1] <= FPS):
                 if h.object == 1: h.left_time = 0
                 pickup_tasks[h.handle_type - 1].append(h)
         for h in self.handle_list:
@@ -959,14 +1014,17 @@ class Map:
                 delivery_tasks_h = delivery_tasks[h.id]
                 short_material_num = len(short_material)
                 if h.handle_type > HANDLE_OBJECT_NUM: avg_revenue = 0
-                else: avg_revenue = (
-                    SELL_PRICE[h.handle_type - 1] -
-                    BUY_PRICE[h.handle_type - 1]) / len(short_material)
+                else:
+                    avg_revenue = (
+                        SELL_PRICE[h.handle_type - 1] -
+                        BUY_PRICE[h.handle_type - 1]) / len(short_material)
                 for m in short_material:
                     delivery_tasks_h.append(m)
                     for h_ in pickup_tasks[m - 1]:
                         delivery_edges.setdefault(h_, list()).append(
-                            (h, avg_revenue, get_distance(h_.x, h.x, h_.y, h.y), short_material_num))
+                            (h, avg_revenue,
+                             get_distance(h_.x, h.x, h_.y,
+                                          h.y), short_material_num))
 
         delivery_origins = list(delivery_edges.keys())
         left_frame = TOTAL_TIME * 60 * FPS - self.frame
@@ -978,8 +1036,9 @@ class Map:
                     if len(delivery_origins) <= 0:
                         continue
                     distance_list = [
-                        max(get_distance(r.x, h_.x, r.y, h_.y) / MAX_FORE_SPEED,
-                            h_.left_time / FPS) *
+                        max(
+                            get_distance(r.x, h_.x, r.y, h_.y) /
+                            MAX_FORE_SPEED, h_.left_time / FPS) *
                         STORE_COST[h_.handle_type - 1]
                         for h_ in delivery_origins
                     ]
@@ -987,14 +1046,16 @@ class Map:
                     h = delivery_origins[h_idx]
 
                     revenue_list = [
-                        -(i[1] / PRODUCE_TIME[i[0].handle_type-1] * i[2] / MAX_FORE_SPEED) # 1
+                        -(i[1] / PRODUCE_TIME[i[0].handle_type - 1] * i[2] /
+                          MAX_FORE_SPEED)  # 1
                         for i in delivery_edges[h]
                     ]
                     for h__idx in np.argsort(revenue_list):
                         h_: Handle = delivery_edges[h][h__idx][0]
                         if h.handle_type in h_.material_shortage:
                             break
-                    if get_distance(r.x, h.x, r.y, h.y) + get_distance(h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
+                    if get_distance(r.x, h.x, r.y, h.y) + get_distance(
+                            h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
                         r.add_task(h.x, h.y, BUY, self.frame)
                         h.is_assigned_pickup = 1
                         delivery_origins.pop(h_idx)
@@ -1025,12 +1086,19 @@ class Map:
 
     def set_robots_targets1(self):
         pickup_tasks = [[] for i in range(HANDLE_OBJECT_NUM)]
-        avg_profit_type = [np.array([0.0, 0, 0]) for i in range(HANDLE_OBJECT_NUM)]
+        avg_profit_type = [
+            np.array([0.0, 0, 0]) for i in range(HANDLE_OBJECT_NUM)
+        ]
         delivery_tasks = {}
         delivery_edges = {}
         for h in self.handle_list:
             if h.handle_type > HANDLE_OBJECT_NUM: continue
-            if ((h.object == 1 or (0 <= h.left_time <= (MAP_SIZE * 2) / MAX_FORE_SPEED * FPS * 0.1)) and h.is_assigned_pickup == 0): # or (h.left_time > 0 and PRODUCE_TIME[h.handle_type-1] <= FPS):
+            if (
+                (h.object == 1 or
+                 (0 <= h.left_time <=
+                  (MAP_SIZE * 2) / MAX_FORE_SPEED * FPS * 0.1))
+                    and h.is_assigned_pickup == 0
+            ):  # or (h.left_time > 0 and PRODUCE_TIME[h.handle_type-1] <= FPS):
                 if h.object == 1: h.left_time = 0
                 pickup_tasks[h.handle_type - 1].append(h)
         for h in self.handle_list:
@@ -1048,15 +1116,18 @@ class Map:
                             SELL_PRICE[h.handle_type - 1] -
                             BUY_PRICE[h.handle_type - 1]) / len(short_material)
                     elif h.left_time > 0:
-                        avg_revenue = (
-                            SELL_PRICE[h.handle_type - 1] -
-                            BUY_PRICE[h.handle_type - 1]) / len(short_material) / 2
+                        avg_revenue = (SELL_PRICE[h.handle_type - 1] -
+                                       BUY_PRICE[h.handle_type -
+                                                 1]) / len(short_material) / 2
                 for m in short_material:
-                    avg_profit_type[m-1] += np.array([avg_revenue, PRODUCE_TIME[h.handle_type - 1], 1])
+                    avg_profit_type[m - 1] += np.array(
+                        [avg_revenue, PRODUCE_TIME[h.handle_type - 1], 1])
                     delivery_tasks_h.append(m)
                     for h_ in pickup_tasks[m - 1]:
                         delivery_edges.setdefault(h_, list()).append(
-                            (h, avg_revenue, get_distance(h_.x, h.x, h_.y, h.y), short_material_num))
+                            (h, avg_revenue,
+                             get_distance(h_.x, h.x, h_.y,
+                                          h.y), short_material_num))
 
         delivery_origins = list(delivery_edges.keys())
         left_frame = TOTAL_TIME * 60 * FPS - self.frame
@@ -1068,21 +1139,25 @@ class Map:
                     if len(delivery_origins) <= 0:
                         continue
                     distance_list = [
-                        avg_profit_type[h_.handle_type - 1][0] / max(get_distance(r.x, h_.x, r.y, h_.y) / MAX_FORE_SPEED, h_.left_time / FPS)  / avg_profit_type[h_.handle_type - 1][2]
+                        avg_profit_type[h_.handle_type - 1][0] / max(
+                            get_distance(r.x, h_.x, r.y, h_.y) /
+                            MAX_FORE_SPEED, h_.left_time / FPS) /
+                        avg_profit_type[h_.handle_type - 1][2]
                         for h_ in delivery_origins
                     ]
                     h_idx = np.argmax(distance_list)
                     h = delivery_origins[h_idx]
 
                     revenue_list = [
-                        -(i[1] / (i[2] / MAX_FORE_SPEED)) # 2
+                        -(i[1] / (i[2] / MAX_FORE_SPEED))  # 2
                         for i in delivery_edges[h]
                     ]
                     for h__idx in np.argsort(revenue_list):
                         h_: Handle = delivery_edges[h][h__idx][0]
                         if h.handle_type in h_.material_shortage:
                             break
-                    if get_distance(r.x, h.x, r.y, h.y) + get_distance(h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
+                    if get_distance(r.x, h.x, r.y, h.y) + get_distance(
+                            h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
                         r.add_task(h.x, h.y, BUY, self.frame)
                         h.is_assigned_pickup = 1
                         delivery_origins.pop(h_idx)
@@ -1111,15 +1186,21 @@ class Map:
                         r.add_task(r.x, r.y, DESTROY, self.frame)
                         # print_to_txt("no where to go")
 
-
     def set_robots_targets2(self):
         pickup_tasks = [[] for i in range(HANDLE_OBJECT_NUM)]
-        avg_profit_type = [np.array([0.0, 0, 0]) for i in range(HANDLE_OBJECT_NUM)]
+        avg_profit_type = [
+            np.array([0.0, 0, 0]) for i in range(HANDLE_OBJECT_NUM)
+        ]
         delivery_tasks = {}
         delivery_edges = {}
         for h in self.handle_list:
             if h.handle_type > HANDLE_OBJECT_NUM: continue
-            if ((h.object == 1 or (0 <= h.left_time <= (MAP_SIZE * 2) / MAX_FORE_SPEED * FPS * 0.1)) and h.is_assigned_pickup == 0): # or (h.left_time > 0 and PRODUCE_TIME[h.handle_type-1] <= FPS):
+            if (
+                (h.object == 1 or
+                 (0 <= h.left_time <=
+                  (MAP_SIZE * 2) / MAX_FORE_SPEED * FPS * 0.1))
+                    and h.is_assigned_pickup == 0
+            ):  # or (h.left_time > 0 and PRODUCE_TIME[h.handle_type-1] <= FPS):
                 if h.object == 1: h.left_time = 0
                 pickup_tasks[h.handle_type - 1].append(h)
         for h in self.handle_list:
@@ -1137,15 +1218,18 @@ class Map:
                             SELL_PRICE[h.handle_type - 1] -
                             BUY_PRICE[h.handle_type - 1]) / len(short_material)
                     elif h.left_time > 0:
-                        avg_revenue = (
-                            SELL_PRICE[h.handle_type - 1] -
-                            BUY_PRICE[h.handle_type - 1]) / len(short_material) / 2
+                        avg_revenue = (SELL_PRICE[h.handle_type - 1] -
+                                       BUY_PRICE[h.handle_type -
+                                                 1]) / len(short_material) / 2
                 for m in short_material:
-                    avg_profit_type[m-1] += np.array([avg_revenue, PRODUCE_TIME[h.handle_type - 1], 1])
+                    avg_profit_type[m - 1] += np.array(
+                        [avg_revenue, PRODUCE_TIME[h.handle_type - 1], 1])
                     delivery_tasks_h.append(m)
                     for h_ in pickup_tasks[m - 1]:
                         delivery_edges.setdefault(h_, list()).append(
-                            (h, avg_revenue, get_distance(h_.x, h.x, h_.y, h.y), short_material_num))
+                            (h, avg_revenue,
+                             get_distance(h_.x, h.x, h_.y,
+                                          h.y), short_material_num))
 
         delivery_origins = list(delivery_edges.keys())
         left_frame = TOTAL_TIME * 60 * FPS - self.frame
@@ -1157,21 +1241,26 @@ class Map:
                     if len(delivery_origins) <= 0:
                         continue
                     distance_list = [
-                        avg_profit_type[h_.handle_type - 1][0] / max(get_distance(r.x, h_.x, r.y, h_.y) / MAX_FORE_SPEED, h_.left_time / FPS)  / avg_profit_type[h_.handle_type - 1][2]
+                        avg_profit_type[h_.handle_type - 1][0] / max(
+                            get_distance(r.x, h_.x, r.y, h_.y) /
+                            MAX_FORE_SPEED, h_.left_time / FPS) /
+                        avg_profit_type[h_.handle_type - 1][2]
                         for h_ in delivery_origins
                     ]
                     h_idx = np.argmax(distance_list)
                     h = delivery_origins[h_idx]
 
                     revenue_list = [
-                        -(i[1] - i[2] / MAX_FORE_SPEED * STORE_COST[i[0].handle_type - 1]) # 2
+                        -(i[1] - i[2] / MAX_FORE_SPEED *
+                          STORE_COST[i[0].handle_type - 1])  # 2
                         for i in delivery_edges[h]
                     ]
                     for h__idx in np.argsort(revenue_list):
                         h_: Handle = delivery_edges[h][h__idx][0]
                         if h.handle_type in h_.material_shortage:
                             break
-                    if get_distance(r.x, h.x, r.y, h.y) + get_distance(h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
+                    if get_distance(r.x, h.x, r.y, h.y) + get_distance(
+                            h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
                         r.add_task(h.x, h.y, BUY, self.frame)
                         h.is_assigned_pickup = 1
                         delivery_origins.pop(h_idx)
