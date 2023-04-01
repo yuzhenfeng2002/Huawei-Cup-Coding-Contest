@@ -62,7 +62,6 @@ class AStarPlanner:
 
         while 1:
             if len(open_set) == 0:
-                print("Open set is empty..")
                 break
 
             c_id = min(open_set,
@@ -72,7 +71,6 @@ class AStarPlanner:
 
             # 通过追踪当前位置current.x和current.y来动态展示路径寻找
             if current.x == goal_node.x and current.y == goal_node.y:
-                print("Find goal")
                 goal_node.parent_index = current.parent_index
                 goal_node.cost = current.cost
                 break
