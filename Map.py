@@ -1,7 +1,10 @@
-from Params import *
-import numpy as np
 import random
+import time
+
+import numpy as np
+
 from Astar import *
+from Params import *
 
 random.seed(RAND_SEED)
 
@@ -407,39 +410,33 @@ class Robot:
     def strategy_path(self):
         self.strategy_dict = {}
         if len(self.path) > 0:
-            self.path_x, self.path_y = self.path[len(self.path) - 1]  #可优化
+            self.path_x, self.path_y = self.path[0]  #可优化
         if self.x_ is None or self.y_ is None or len(self.path) == 0:
             stop_strategy = {FORWARD: 0, ROTATE: 0}
             self.strategy_dict = stop_strategy
             return
         distance = get_distance(self.x, self.path_x, self.y, self.path_y)
         distance2 = get_distance(self.x, self.x_, self.y, self.y_)
-        #如果到达路径点则更新到下一个路径点并在path中删除已经到达的路径点
-        if distance < ROBO_HANDLE_DIST:
-            self.path.pop()
-            if len(self.path) > 0:
-                self.path_x, self.path_y = self.path[len(self.path) - 1]  #可优化
         # 如果已经到达目的地则将小车变为未规划状态
         if distance2 < ROBO_HANDLE_DIST:
             stop_strategy = {FORWARD: 0, ROTATE: 0, self.arrive(): -1}
             self.strategy_dict = stop_strategy
             self.is_plan = False
             return
+        #如果到达路径点则更新到下一个路径点并在path中删除已经到达的路径点
+        if distance < ROBO_HANDLE_DIST:
+            self.path.pop(0)
+            if len(self.path) > 0:
+                self.path_x, self.path_y = self.path[0]  #可优化
 
         theta = get_theta(self.x, self.path_x, self.y, self.path_y)
         angle = get_angle(self.direction, theta)
 
         speed = min(distance / self.delta_time, MAX_FORE_SPEED)
         if abs(angle) > np.pi / 2 - 0.1:
-            if distance < 8 * ROBO_HANDLE_DIST:
-                speed = 2 * distance / 8 / ROBO_HANDLE_DIST
-                self.is_avoid = True
-            else:
-                speed = 2 * distance / 8 / ROBO_HANDLE_DIST + 2
-        if distance < 4 * ROBO_HANDLE_DIST:
-            if abs(angle) > np.pi / 4:
-                speed = distance / 2 * ROBO_HANDLE_DIST
-                self.is_avoid = True
+            speed = 0
+        if abs(angle) > np.pi / 4:
+            speed = 0
         rotate_speed = min(abs(angle) / self.delta_time, MAX_ROTATE_SPEED)
         self.strategy_dict = {
             FORWARD: speed,
@@ -512,7 +509,7 @@ class Map:
             self.map_type = 1
         elif num == 8:
             self.map_type = 2
-            self.a_star = AStarPlanner(MAP2_OX, MAP2_OY, 1, 0.5)
+            self.a_star = AStarPlanner(MAP2_OX, MAP2_OY, 0.6, 1)
         elif num == 13:
             self.map_type = 3
             self.a_star = AStarPlanner(MAP3_OX, MAP3_OY, 1, 0.5)
@@ -568,91 +565,27 @@ class Map:
 
     def output_strategy(self):
         outputs = ""
-        print_to_txt('frame: ' + str(self.frame), 1)
+        # print_to_txt('frame: ' + str(self.frame), 1)
         for r in self.robot_list:
-            print_to_txt(r.id, 1)
+            # print_to_txt(r.id, 1)
             #如果有任务且还没有进行路径规划则进行路径规划
             if r.is_assigned_task != 0 and r.is_plan == False:
-                print_to_txt(
-                    str(r.x) + ' ' + str(r.y) + ' ' + str(r.x_) + ' ' +
-                    str(r.y_), 1)
+                # print_to_txt(
+                #     str(r.x) + ' ' + str(r.y) + ' ' + str(r.x_) + ' ' +
+                #     str(r.y_), 1)
                 r.path = self.a_star.planning(r.x, r.y, r.x_, r.y_)
                 r.is_plan = True
-                print_to_txt(r.path, 1)
+                # print_to_txt(r.path, 1)
             r.is_avoid = False
             if r.y > 48:
                 r.is_avoid = True
             #这里应当修改为沿路径行驶，还未修改。
-            r.strategy()
-        print_to_txt('final', 1)
-        #用人工势场方法进行防撞修正
-        for i in range(ROBO_NUM):
-            r: Robot = self.robot_list[i]
-            #计算合力
-            robot_force_x = 0
-            robot_force_y = 0
-            #计算到目标点的引力
-            aforce_x, aforce_y = r.attractive_force()
-            #计算到其他机器人的斥力
-            for j in range(ROBO_NUM):
-                if i != j:
-                    r_: Robot = self.robot_list[j]
-                    distance = get_distance(r.x, r_.x, r.y, r_.y)
-                    if distance < 7.5 * ROBO_RADIUS_FULL * r.get_speed(
-                    ) / 6 + 3:
-                        #计算到其他机器人的斥力
-                        dx = r.x - r_.x
-                        dy = r.y - r_.y
-                        robot_force_x += dx / distance * (
-                            15 * ROBO_RADIUS_FULL / distance -
-                            2 * ROBO_RADIUS_FULL)
-                        robot_force_y += dy / distance * (
-                            15 * ROBO_RADIUS_FULL / distance -
-                            2 * ROBO_RADIUS_FULL)
-            #计算合力向量，并根据现在机器人速度和合力夹角给出调整
-            # print_to_txt(
-            #     str(self.frame) + " id:" + str(r.id) + " force:" +
-            #     str(robot_force_x) + " " + str(robot_force_y))
-            force = np.array(
-                [robot_force_x + aforce_x, robot_force_y + aforce_y])
-            dir1 = np.array([np.cos(r.direction), np.sin(r.direction)])
-            # print_to_txt("dir " + str(dir1) + " " + str(r.direction))
-            force_val = np.linalg.norm(force)
-            if force_val > 1:
-                cos_angle = np.dot(force, dir1) / force_val
-                angle = np.arccos(cos_angle)
-                cross = -np.cross(force, dir1)
-                # print_to_txt("angle:" + str(angle) + " " + str(cross))
-                force
-                if angle > np.pi * 0.8:
-                    if force_val > 3:
-                        if r.object_type:
-                            r.set_speed(r.get_speed() - force_val / 4)
-                        else:
-                            r.set_speed(r.get_speed() - force_val / 2)
-                    if cross > 0:
-                        r.set_rotate(r.rotate_speed + force_val * angle / 10)
-                    # print_to_txt("set " + str(r.id) + " 1")
-                    if cross <= 0:
-                        r.set_rotate(r.rotate_speed - force_val * angle / 10)
-                elif angle < np.pi * 0.3:
-                    if force_val:
-                        r.set_speed(r.get_speed() + force_val / 4)
-                else:
-                    if cross > 0:
-                        r.set_rotate(r.rotate_speed + force_val * angle / 10)
-                    # print_to_txt("set " + str(r.id) + " 1")
-                    if cross <= 0:
-                        r.set_rotate(r.rotate_speed - force_val * angle / 10)
-            # elif np.linalg.norm(force) > 5:
-            #     if r.get_speed() < 4:
-            #         r.set_speed(r.get_speed() + 1)
-            # print_to_txt("set " + str(r.id) + " -1")
-
+            r.strategy_path()
+        # print_to_txt('final', 1)
         for r in self.robot_list:
             #如果靠近边缘则限制最大速度
-            if is_boundary(r.x, r.y, r.direction) and r.get_speed() > 3:
-                r.set_speed(3)
+            if r.get_speed() > 4:
+                r.set_speed(4)
             # if r.is_recede:
             #     r.is_recede -= 1
             output = self.strategy_to_str(r)
