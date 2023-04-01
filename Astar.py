@@ -1,9 +1,5 @@
 import math
 
-import matplotlib.pyplot as plt
-
-show_animation = True
-
 
 class AStarPlanner:
 
@@ -73,17 +69,6 @@ class AStarPlanner:
                        key=lambda o: open_set[o].cost + self.calc_heuristic(
                            goal_node, open_set[o]))
             current = open_set[c_id]
-
-            # # show graph
-            # if show_animation:  # pragma: no cover
-            #     plt.plot(self.calc_grid_position(current.x, self.min_x),
-            #              self.calc_grid_position(current.y, self.min_y), "xc")
-            #     # for stopping simulation with the esc key.
-            #     plt.gcf().canvas.mpl_connect(
-            #         'key_release_event',
-            #         lambda event: [exit(0) if event.key == 'escape' else None])
-            #     if len(closed_set.keys()) % 10 == 0:
-            #         plt.pause(0.001)
 
             # 通过追踪当前位置current.x和current.y来动态展示路径寻找
             if current.x == goal_node.x and current.y == goal_node.y:
@@ -193,15 +178,9 @@ class AStarPlanner:
         self.min_y = round(min(oy))
         self.max_x = round(max(ox))
         self.max_y = round(max(oy))
-        # print("min_x:", self.min_x)
-        # print("min_y:", self.min_y)
-        # print("max_x:", self.max_x)
-        # print("max_y:", self.max_y)
 
         self.x_width = round((self.max_x - self.min_x) / self.resolution)
         self.y_width = round((self.max_y - self.min_y) / self.resolution)
-        # print("x_width:", self.x_width)
-        # print("y_width:", self.y_width)
 
         # obstacle map generation
         self.obstacle_map = [[False for _ in range(self.y_width)]
@@ -224,65 +203,3 @@ class AStarPlanner:
                   [1, -1, math.sqrt(2)], [1, 1, math.sqrt(2)]]
 
         return motion
-
-
-def main():
-    print(__file__ + " start!!")
-    map_array = []
-    file_path = '../maps/4.txt'
-    with open(file_path, 'r') as f:
-        for line in f:
-            row = [1 if c == '#' else 0 for c in line.strip()]
-            map_array.append(row)
-    # start and goal position
-    sx = 1  # [m]
-    sy = 1  # [m]
-    gx = 45  # [m]
-    gy = 45  # [m]
-    grid_size = 1  # [m]
-    robot_radius = 0.5  # [m]
-
-    # set obstacle positions
-    ox, oy = [], []
-    for i in range(0, 50):
-        ox.append(i)
-        oy.append(0.0)
-    for i in range(0, 50):
-        ox.append(i)
-        oy.append(50)
-    for i in range(0, 50):
-        ox.append(0.0)
-        oy.append(i)
-    for i in range(0, 50):
-        ox.append(50.0)
-        oy.append(i)
-    for i in range(len(map_array)):
-        for j in range(len(map_array)):
-            if map_array[i][j] == 1:
-                ox.append(j * 0.5)
-                oy.append(-i * 0.5 + 50)
-    # print('ox')
-    # print(ox)
-    # print('oy')
-    # print(oy)
-    if show_animation:  # pragma: no cover
-        plt.plot(ox, oy, ".k")
-        plt.plot(sx, sy, "og")
-        plt.plot(gx, gy, "xb")
-        plt.grid(True)
-        plt.axis("equal")
-
-    a_star = AStarPlanner(ox, oy, grid_size, robot_radius)
-    path = a_star.planning(sx, sy, gx, gy)
-    # path.pop()
-    # print('try: ' + str(path[len(path) - 1]))
-    if show_animation:  # pragma: no cover
-        x_values = [coord[0] for coord in path]
-        y_values = [coord[1] for coord in path]
-        plt.plot(x_values, y_values, "-r")
-        plt.pause(0.001)
-        plt.show()
-
-
-if __name__ == '__main__':
-    main()
