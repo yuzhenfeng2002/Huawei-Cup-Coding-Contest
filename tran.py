@@ -1,4 +1,5 @@
 import math
+import time
 
 import matplotlib.pyplot as plt
 
@@ -219,9 +220,9 @@ class AStarPlanner:
     @staticmethod
     def get_motion_model():
         # dx, dy, cost
-        motion = [[1, 0, 1], [0, 1, 1], [-1, 0, 1], [0, -1, 1],
-                  [-1, -1, math.sqrt(2)], [-1, 1, math.sqrt(2)],
-                  [1, -1, math.sqrt(2)], [1, 1, math.sqrt(2)]]
+        motion = [[1, 0, 1], [0, 1, 1], [-1, 0, 1], [0, -1,
+                                                     1], [-1, -1, 1.414],
+                  [-1, 1, 1.414], [1, -1, 1.414], [1, 1, 1.414]]
 
         return motion
 
@@ -229,18 +230,18 @@ class AStarPlanner:
 def main():
     print(__file__ + " start!!")
     map_array = []
-    file_path = '../maps/4.txt'
+    file_path = '../maps/2.txt'
     with open(file_path, 'r') as f:
         for line in f:
             row = [1 if c == '#' else 0 for c in line.strip()]
             map_array.append(row)
     # start and goal position
-    sx = 1  # [m]
-    sy = 1  # [m]
-    gx = 45  # [m]
-    gy = 45  # [m]
-    grid_size = 1  # [m]
-    robot_radius = 0.5  # [m]
+    sx = 15.75  # [m]
+    sy = 26.75  # [m]
+    gx = 9.25  # [m]
+    gy = 29.25  # [m]
+    grid_size = 0.6  # [m]
+    robot_radius = 0.6  # [m]
 
     # set obstacle positions
     ox, oy = [], []
@@ -265,15 +266,23 @@ def main():
     # print(ox)
     # print('oy')
     # print(oy)
+    # if show_animation:  # pragma: no cover
+    #     plt.plot(ox, oy, ".k")
+    #     plt.plot(sx, sy, "og")
+    #     plt.plot(gx, gy, "xb")
+    #     plt.grid(True)
+    #     plt.axis("equal")
+    a_star = AStarPlanner(ox, oy, grid_size, robot_radius)
+    start_time = time.time()
+    path = a_star.planning(sx, sy, gx, gy)
+    end_time = time.time()
+    print("程序计算时间为：", end_time - start_time, "秒")
     if show_animation:  # pragma: no cover
         plt.plot(ox, oy, ".k")
         plt.plot(sx, sy, "og")
         plt.plot(gx, gy, "xb")
         plt.grid(True)
         plt.axis("equal")
-
-    a_star = AStarPlanner(ox, oy, grid_size, robot_radius)
-    path = a_star.planning(sx, sy, gx, gy)
     # path.pop()
     # print('try: ' + str(path[len(path) - 1]))
     if show_animation:  # pragma: no cover
