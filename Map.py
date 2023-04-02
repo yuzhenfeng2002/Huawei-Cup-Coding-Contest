@@ -411,7 +411,7 @@ class Robot:
         self.strategy_dict = {}
         if len(self.path) > 0:
             self.path_x, self.path_y = self.path[0]  #可优化
-        if self.x_ is None or self.y_ is None:
+        if self.x_ is None or self.y_ is None or len(self.path) == 0:
             stop_strategy = {FORWARD: 0, ROTATE: 0}
             self.strategy_dict = stop_strategy
             return
