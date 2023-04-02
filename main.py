@@ -49,7 +49,10 @@ if __name__ == '__main__':
         m.set_robots_targets()
 
         sys.stdout.write('%d\n' % frame)
-        sys.stdout.write(m.output_strategy())
+        if m.map_type == 3:
+            sys.stdout.write(m.output_strategy2())
+        else:
+            sys.stdout.write(m.output_strategy())
         finish()
         # if frame > 200:
         #     raise KeyError
