@@ -218,6 +218,49 @@ class AStarPlanner:
                         break
 
     @staticmethod
+    def reduce_point_by_slope(rx, ry):
+        """
+        reduce_point_by_slope 根据斜率经典路径点
+
+        :param rx: AStar 返回的x路径索引
+        :param ry: AStar 返回的y路径索引
+        :return:
+            rx_reduce:  精简过的x路径
+            ry_reduce:  精简过的y路径
+        """
+        slope = []
+        for i in range(len(rx) - 1):
+            if rx[i]==rx[i+1]:
+                slope.append(math.inf)
+            else:
+                k = (ry[i+1] - ry[i]) / (rx[i+1] - rx[i])
+                slope.append(k)
+        
+        ## 循环遍历斜率结点，找到斜率相互不同的点的索引
+        point_ind_reduce = []
+        if len(slope)==0:
+            return rx, ry
+        tem_k = slope[0]
+        ## 起点也被精简在外
+        # print("reduce point")
+        for i in range(len(slope)):
+            if abs(slope[i] - tem_k) > 0.1:           ## 此处的参数可以进行调整
+                # print(slope[i] - tem_k)
+                point_ind_reduce.append(i)
+                
+                tem_k = slope[i]
+            else:
+                continue     
+        point_ind_reduce.append(len(slope))
+        # print(len(point_ind_reduce))
+        rx_reduce = []
+        ry_reduce = []
+        for i in range(len(point_ind_reduce)):
+            rx_reduce.append(rx[point_ind_reduce[i]])
+            ry_reduce.append(ry[point_ind_reduce[i]])
+        return rx_reduce, ry_reduce
+
+    @staticmethod
     def get_motion_model():
         # dx, dy, cost
         motion = [[1, 0, 1], [0, 1, 1], [-1, 0, 1], [0, -1,
@@ -230,16 +273,16 @@ class AStarPlanner:
 def main():
     print(__file__ + " start!!")
     map_array = []
-    file_path = '../maps/2.txt'
+    file_path = './maps/1.txt'
     with open(file_path, 'r') as f:
         for line in f:
             row = [1 if c == '#' else 0 for c in line.strip()]
             map_array.append(row)
     # start and goal position
-    sx = 15.75  # [m]
-    sy = 26.75  # [m]
-    gx = 9.25  # [m]
-    gy = 29.25  # [m]
+    sx = 5.0  # [m]
+    sy = 5.0  # [m]
+    gx = 47.0  # [m]
+    gy = 47.0  # [m]
     grid_size = 0.6  # [m]
     robot_radius = 0.6  # [m]
 
@@ -275,10 +318,17 @@ def main():
     a_star = AStarPlanner(ox, oy, grid_size, robot_radius)
     start_time = time.time()
     path = a_star.planning(sx, sy, gx, gy)
+    print(path)
+    anti_zip_path = zip(*path)
+    rx, ry = anti_zip_path
+    rx_reduce, ry_reduce = a_star.reduce_point_by_slope(rx, ry)
+    
     end_time = time.time()
     print("程序计算时间为：", end_time - start_time, "秒")
     if show_animation:  # pragma: no cover
         plt.plot(ox, oy, ".k")
+        # plt.plot(rx, ry, '.g')
+        plt.plot(rx_reduce, ry_reduce, '.r')
         plt.plot(sx, sy, "og")
         plt.plot(gx, gy, "xb")
         plt.grid(True)
