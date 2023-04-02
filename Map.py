@@ -341,7 +341,7 @@ class Robot:
     def strategy(self):
         self.strategy_dict = {}
 
-        if self.x_ is None or self.y_ is None:
+        if True:
             stop_strategy = {FORWARD: 0, ROTATE: 0}
             self.strategy_dict = stop_strategy
             return
@@ -411,9 +411,12 @@ class Robot:
         self.strategy_dict = {}
         if len(self.path) > 0:
             self.path_x, self.path_y = self.path[0]  #可优化
-        if self.x_ is None or self.y_ is None or len(self.path) == 0:
+        if self.x_ is None or self.y_ is None:
             stop_strategy = {FORWARD: 0, ROTATE: 0}
             self.strategy_dict = stop_strategy
+            return
+        if len(self.path) == 0:
+            self.is_plan = False
             return
         distance = get_distance(self.x, self.path_x, self.y, self.path_y)
         distance2 = get_distance(self.x, self.x_, self.y, self.y_)
@@ -493,7 +496,7 @@ class Map:
         self.choose = 2
         self.ox = []
         self.oy = []
-        self.a_star = AStarPlanner(MAP1_OX, MAP1_OY, 1, 0.5)
+        self.a_star = AStarPlanner(MAP1_OX, MAP1_OY, 0.5, 1)
         self.map_type = 1
 
     def update_map(self, frame, money):
@@ -509,10 +512,10 @@ class Map:
             self.map_type = 1
         elif num == 8:
             self.map_type = 2
-            self.a_star = AStarPlanner(MAP2_OX, MAP2_OY, 0.6, 1)
+            self.a_star = AStarPlanner(MAP2_OX, MAP2_OY, 0.5, 0.8)
         elif num == 13:
             self.map_type = 3
-            self.a_star = AStarPlanner(MAP3_OX, MAP3_OY, 1, 0.5)
+            self.a_star = AStarPlanner(MAP3_OX, MAP3_OY, 0.6, 1)
         else:
             self.map_type = 4
             self.a_star = AStarPlanner(MAP4_OX, MAP4_OY, 1, 0.5)
@@ -574,11 +577,12 @@ class Map:
                 #     str(r.x) + ' ' + str(r.y) + ' ' + str(r.x_) + ' ' +
                 #     str(r.y_), 1)
                 r.path = self.a_star.planning(r.x, r.y, r.x_, r.y_)
+                # if (len(r.path) == 1):
+                #     r.arrive()
+                #     break
                 r.is_plan = True
                 # print_to_txt(r.path, 1)
             r.is_avoid = False
-            if r.y > 48:
-                r.is_avoid = True
             #这里应当修改为沿路径行驶，还未修改。
             r.strategy_path()
         # print_to_txt('final', 1)
@@ -592,72 +596,20 @@ class Map:
             if output == "":
                 continue
             outputs += output
+        # print_to_txt(self.frame, 1)
+        # print_to_txt(outputs, 1)
         return outputs
 
     def output_strategy2(self):
         outputs = ""
         for r in self.robot_list:
             r.is_avoid = False
-            r.strategy2()
-        #用人工势场方法进行防撞修正
-        for i in range(ROBO_NUM):
-            r: Robot = self.robot_list[i]
-            #计算合力
-            robot_force_x = 0
-            robot_force_y = 0
-            #计算到目标点的引力
-            aforce_x, aforce_y = aforce_x, aforce_y = r.attractive_force2()
-            #计算到其他机器人的斥力
-            for j in range(ROBO_NUM):
-                if i != j:
-                    r_: Robot = self.robot_list[j]
-                    distance = get_distance(r.x, r_.x, r.y, r_.y)
-                    if distance < 3 * ROBO_RADIUS_FULL * r.get_speed() / 3 + 3:
-                        #计算到其他机器人的斥力
-                        dx = r.x - r_.x
-                        dy = r.y - r_.y
-                        robot_force_x += 10 * ROBO_RADIUS_FULL * dx / distance**2
-                        robot_force_y += 10 * ROBO_RADIUS_FULL * dy / distance**2
-            #计算合力向量，并根据现在机器人速度和合力夹角给出调整
-            # print_to_txt(
-            #     str(self.frame) + " id:" + str(r.id) + " force:" +
-            #     str(robot_force_x) + " " + str(robot_force_y))
-            force = np.array(
-                [robot_force_x + aforce_x, robot_force_y + aforce_y])
-            dir1 = np.array([np.cos(r.direction), np.sin(r.direction)])
-            # print_to_txt("dir " + str(dir1) + " " + str(r.direction))
-            force_val = np.linalg.norm(force)
-            if force_val > 2:
-                cos_angle = np.dot(force, dir1) / force_val
-                angle = np.arccos(cos_angle)
-                cross = -np.cross(force, dir1)
-                # print_to_txt("angle:" + str(angle) + " " + str(cross))
-                force
-                if angle > np.pi * 0.7:
-                    if force_val > 4:
-                        if r.object_type:
-                            r.set_speed(r.get_speed() - force_val / 4)
-                        else:
-                            r.set_speed(r.get_speed() - force_val / 2)
-                    if cross > 0:
-                        r.set_rotate(r.rotate_speed + force_val * np.pi / 10)
-                    # print_to_txt("set " + str(r.id) + " 1")
-                    if cross <= 0:
-                        r.set_rotate(r.rotate_speed - force_val * np.pi / 10)
-                elif angle < np.pi * 0.3:
-                    if force_val:
-                        r.set_speed(r.get_speed() + force_val / 4)
-                else:
-                    if cross > 0:
-                        r.set_rotate(r.rotate_speed + np.pi / 10)
-                    # print_to_txt("set " + str(r.id) + " 1")
-                    if cross <= 0:
-                        r.set_rotate(r.rotate_speed - np.pi / 10)
+            r.strategy()
 
         for r in self.robot_list:
             #如果靠近边缘则限制最大速度
-            if is_boundary(r.x, r.y, r.direction) and r.get_speed() > 3:
-                r.set_speed(3)
+            if r.get_speed() > 0:
+                r.set_speed(0)
             # if r.is_recede:
             #     r.is_recede -= 1
             output = self.strategy_to_str(r)
