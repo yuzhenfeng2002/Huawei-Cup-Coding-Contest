@@ -318,7 +318,7 @@ def main():
     a_star = AStarPlanner(ox, oy, grid_size, robot_radius)
     start_time = time.time()
     path = a_star.planning(sx, sy, gx, gy)
-    print(path)
+    # print(path)
     anti_zip_path = zip(*path)
     rx, ry = anti_zip_path
     rx_reduce, ry_reduce = a_star.reduce_point_by_slope(rx, ry)
