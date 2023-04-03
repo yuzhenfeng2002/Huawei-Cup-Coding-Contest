@@ -60,57 +60,21 @@ def get_angle(_theta, theta):
 
 
 #判断是否同向
-def is_syntropy(direction1, direction2, rx, ry, rspeed_x, rspeed_y, r_x, r_y,
-                r_speed_x, r_speed_y):
+def is_syntropy(direction1, direction2):
     if direction1 < direction2:
         direction1, direction2 = direction2, direction1
     if direction1 - direction2 < np.pi * 0.15 or (direction1 > np.pi * 0.85 and
                                                   direction2 < -np.pi * 0.85):
-        # 机器人1的位置和速度向量
-        pos1 = np.array([rx, ry])
-        vel1 = np.array([rspeed_x, rspeed_y])
-
-        # 机器人2的位置和速度向量
-        pos2 = np.array([r_x, r_x])
-        vel2 = np.array([r_speed_x, r_speed_y])
-
-        # 计算相对速度向量
-        rel_vel = vel1 - vel2
-
-        # 计算位置向量
-        pos_diff = pos1 - pos2
-
-        # 计算点积
-        dot_product = np.dot(rel_vel, pos_diff)
-        if dot_product > 0:
-            return True
+        return True
     return False
 
 
 #判断是否反向
-def is_opposite(direction1, direction2, rx, ry, rspeed_x, rspeed_y, r_x, r_y,
-                r_speed_x, r_speed_y):
+def is_opposite(direction1, direction2):
     if direction1 < direction2:
         direction1, direction2 = direction2, direction1
     if abs(direction1 - direction2 - np.pi) < np.pi / 6:
-        # 机器人1的位置和速度向量
-        pos1 = np.array([rx, ry])
-        vel1 = np.array([rspeed_x, rspeed_y])
-
-        # 机器人2的位置和速度向量
-        pos2 = np.array([r_x, r_x])
-        vel2 = np.array([r_speed_x, r_speed_y])
-
-        # 计算相对速度向量
-        rel_vel = -vel1 + vel2
-
-        # 计算位置向量
-        pos_diff = pos1 - pos2
-
-        # 计算点积
-        dot_product = np.dot(rel_vel, pos_diff)
-        if dot_product > 0:
-            return True
+        return True
     return False
 
 
@@ -166,7 +130,6 @@ class Map:
         self.choose = 2
         self.ox = []
         self.oy = []
-        self.a_star = BidirectionalAStarPlanner(MAP1_OX, MAP1_OY, 0.6, 0.6)
         self.map_type = 1
 
     def update_map(self, frame, money):
@@ -176,19 +139,24 @@ class Map:
     def init_robots(self):
         for i in range(ROBO_NUM):
             self.robot_list.append(Robot(id=i))
-
-    def init_handles(self, num):
+    #同时初始化障碍物
+    def init_handles(self, num, ox, oy):
         if num == 37:
             self.map_type = 1
+            self.ox,self.oy = ox,oy
+            self.a_star = BidirectionalAStarPlanner(self.ox, self.oy, 0.5, 0.7)
         elif num == 8:
             self.map_type = 2
-            self.a_star = BidirectionalAStarPlanner2(MAP2_OX, MAP2_OY, 0.5, 0.7)
+            self.ox,self.oy = ox,oy
+            self.a_star = BidirectionalAStarPlanner(self.ox, self.oy, 0.5, 0.8)
         elif num == 13:
             self.map_type = 3
-            self.a_star = BidirectionalAStarPlanner(MAP3_OX, MAP3_OY, 0.6, 1)
+            self.ox,self.oy = ox,oy
+            self.a_star = BidirectionalAStarPlanner(self.ox, self.oy, 0.6, 1)
         else:
             self.map_type = 4
-            self.a_star = BidirectionalAStarPlanner2(MAP4_OX, MAP4_OY, 1, 0.7)
+            self.ox,self.oy = ox,oy
+            self.a_star = BidirectionalAStarPlanner2(self.ox, self.oy, 1, 0.7)
         for i in range(num):
             self.handle_list.append(Handle(id=i))
 
@@ -235,18 +203,19 @@ class Map:
             elif s == DESTROY:
                 strategy_str += "destroy {:.0f}\n".format(robot.id)
         return strategy_str
-
+    #地图2的策略
     def output_strategy(self):
         outputs = ""
         # print_to_txt('frame: ' + str(self.frame), 1)
         for r in self.robot_list:
             # print_to_txt(r.id, 1)
+            # print_to_txt(r.is_assigned_task, 1)
             #如果有任务且还没有进行路径规划则进行路径规划
             if r.is_assigned_task != 0 and r.is_plan == False:
+                r.path = self.a_star.planning(r.x, r.y, r.x_, r.y_)
                 # print_to_txt(
                 #     str(r.x) + ' ' + str(r.y) + ' ' + str(r.x_) + ' ' +
                 #     str(r.y_), 1)
-                r.path = self.a_star.planning(r.x, r.y, r.x_, r.y_)
                 # if (len(r.path) == 1):
                 #     r.arrive()
                 #     break
@@ -255,22 +224,29 @@ class Map:
             r.is_avoid = False
             #沿路径行驶。
             r.strategy_path()
-        # for i in range(ROBO_NUM-1):
-        #     r: Robot = self.robot_list[i]
-        #     for j in range(i+1, ROBO_NUM):
-        #         r_: Robot = self.robot_list[j]
-        #         if (get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 10 and 
-        #             abs(abs(r.direction - r_.direction)-np.pi) < np.pi/6):
-        #             theta = get_theta(r.x, r_.x, r.y, r_.y)
-        #             angle = get_angle(r.direction, theta)
-        #             rotate_speed = -np.sign(angle) * np.pi
-        #             r.strategy_dict[1] = rotate_speed
+        #如果两车对向相撞则重新规划路线
+        for i in range(ROBO_NUM-1):
+            r: Robot = self.robot_list[i]
+            for j in range(i+1, ROBO_NUM):
+                r_: Robot = self.robot_list[j]
+                if (get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 2 and 
+                    abs(abs(r.direction - r_.direction)-np.pi) < np.pi/6):
+                    if(r.is_assigned_task==0 or r_.is_assigned_task==0):
+                        continue
+                    ix = int(r_.x/self.a_star.resolution)
+                    iy = int(r_.y/self.a_star.resolution)
+                    self.a_star.obstacle_map[ix][iy] = True
+                    r.path = self.a_star.planning(r.x, r.y, r.x_, r.y_)
+                    self.a_star.obstacle_map[ix][iy] = False
+                    # ix = int(r.x/self.a_star.resolution)
+                    # iy = int(r.y/self.a_star.resolution)
+                    # self.a_star.obstacle_map[ix][iy] = True
+                    # r_.path = self.a_star.planning(r_.x, r_.y, r_.x_, r_.y_)
+                    # self.a_star.obstacle_map[ix][iy] = False
         for r in self.robot_list:
             #如果靠近边缘则限制最大速度
             if r.get_speed() > 4:
                 r.set_speed(4)
-            # if r.is_recede:
-            #     r.is_recede -= 1
             output = self.strategy_to_str(r)
             if output == "":
                 continue
@@ -434,16 +410,6 @@ class Map:
                         delivery_edges[h].pop(h__idx)
                     else:
                         r.add_task(MAP_SIZE, MAP_SIZE, GOTO, self.frame)
-                    # type_list = list(self.get_short_material())
-                    # for t in random.sample(type_list, len(type_list)):
-                    #     for h in random.sample(self.handle_type_dict[t], len(self.handle_type_dict[t])):
-                    #         h: Handle
-                    #         if h.object == 1 and h.is_assigned_pickup == 0:
-                    #             r.add_task(h.x, h.y, 2, self.frame)
-                    #             h.is_assigned_pickup = 1
-                    #             break
-                    #     if r.is_assigned_task == 1:
-                    #         break
                 else:
                     for t in random.sample(MATERIAL_TYPE[r.object_type],
                                            len(MATERIAL_TYPE[r.object_type])):

@@ -3,12 +3,12 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-show_animation = False
+show_animation = True
 
 
 class BidirectionalAStarPlanner:
 
-    def __init__(self, ox, oy, resolution, rr):
+    def __init__(self,resolution, rr):
         """
         Initialize grid map for a star planning
 
@@ -23,7 +23,7 @@ class BidirectionalAStarPlanner:
         self.x_width, self.y_width, self.obstacle_map = None, None, None
         self.resolution = resolution
         self.rr = rr
-        self.calc_obstacle_map(ox, oy)
+        self.obstacle_map=[]
         self.motion = self.get_motion_model()
 
     class Node:
@@ -198,9 +198,9 @@ class BidirectionalAStarPlanner:
 
     @staticmethod
     def calc_heuristic(n1, n2):
-        w = 5.0  # weight of heuristic
-        # d = w * math.hypot(n1.x - n2.x, n1.y - n2.y)
-        d = w*np.abs(n1.x - n2.x) + np.abs(n1.y - n2.y)
+        w = 1.0  # weight of heuristic
+        d = w * math.hypot(n1.x - n2.x, n1.y - n2.y)
+        # d = w*np.abs(n1.x - n2.x) + np.abs(n1.y - n2.y)
         return d
 
     def find_total_cost(self, open_set, lambda_, n1):
@@ -249,17 +249,17 @@ class BidirectionalAStarPlanner:
 
     def calc_obstacle_map(self, ox, oy):
 
-        self.min_x = round(min(ox))
-        self.min_y = round(min(oy))
-        self.max_x = round(max(ox))
-        self.max_y = round(max(oy))
+        self.min_x = 0
+        self.min_y = 0
+        self.max_x = 50
+        self.max_y = 50
         # print("min_x:", self.min_x)
         # print("min_y:", self.min_y)
         # print("max_x:", self.max_x)
         # print("max_y:", self.max_y)
 
-        self.x_width = round((self.max_x - self.min_x) / self.resolution)
-        self.y_width = round((self.max_y - self.min_y) / self.resolution)
+        self.x_width = round(50 / self.resolution)
+        self.y_width = round(50 / self.resolution)
         # print("x_width:", self.x_width)
         # print("y_width:", self.y_width)
 
@@ -282,19 +282,26 @@ class BidirectionalAStarPlanner:
         motion = [[1, 0, 1],
                   [0, 1, 1],
                   [-1, 0, 1],
-                  [0, -1, 1],]
-                #   [-1, -1, math.sqrt(2)],
-                #   [-1, 1, math.sqrt(2)],
-                #   [1, -1, math.sqrt(2)],
-                #   [1, 1, math.sqrt(2)]]
+                  [0, -1, 1],
+                  [-1, -1, math.sqrt(2)],
+                  [-1, 1, math.sqrt(2)],
+                  [1, -1, math.sqrt(2)],
+                  [1, 1, math.sqrt(2)]]
+                #   [-1, 2, math.sqrt(5)],
+                #   [1, 2, math.sqrt(5)],
+                #   [-2, 1, math.sqrt(5)],
+                #   [2, 1, math.sqrt(5)],
+                #   [-2, -1, math.sqrt(5)],
+                #   [2, -1, math.sqrt(5)],
+                #   [-1, -2, math.sqrt(5)],
+                #   [1, -2, math.sqrt(5)]]
 
         return motion
-
 
 def main():
     print(__file__ + " start!!")
     map_array = []
-    file_path = '../maps/4.txt'
+    file_path = '../maps/2.txt'
     with open(file_path, 'r') as f:
         for line in f:
             row = [1 if c == '#' else 0 for c in line.strip()]
@@ -304,7 +311,7 @@ def main():
     sy = 5.0  # [m]
     gx = 45.0  # [m]
     gy = 40.0  # [m]
-    grid_size = 1  # [m]
+    grid_size = 1# [m]
     robot_radius = 0.5  # [m]
     # set obstacle positions
     ox, oy = [], []
@@ -323,9 +330,9 @@ def main():
     for i in range(len(map_array)-1):
         for j in range(len(map_array)-1):
             if map_array[i][j] == 1:
-                ox.append(j * 0.5)
-                oy.append(-i * 0.5 + 50)
-    # # set obstacle positions
+                ox.append(j * 0.5+0.25)
+                oy.append(-i * 0.5 + 50+0.25)
+    # # # set obstacle positions
     # ox, oy = [], []
     # for i in range(-10, 60):
     #     ox.append(i)
@@ -342,20 +349,25 @@ def main():
     # for i in range(-10, 40):
     #     ox.append(20.0)
     #     oy.append(i)
-    # for i in range(0, 80):
+    # for i in range(0, 40):
     #     ox.append(40.0)
     #     oy.append(60.0 - i)
     print("ox:"+str(len(ox)))
-    bidir_a_star = BidirectionalAStarPlanner(ox, oy, grid_size, robot_radius)
+    bidir_a_star = BidirectionalAStarPlanner(grid_size, robot_radius)
+    bidir_a_star.calc_obstacle_map(ox,oy)
+    # for i in range(0, 20):
+    #     ox.append(40.0)
+    #     oy.append(20.0 - i)
+    plt.plot(ox, oy, ".k")
+    plt.plot(sx, sy, "og")
+    plt.plot(gx, gy, "ob")
+    plt.grid(True)
+    bidir_a_star.calc_obstacle_map(ox,oy)
     start_time = time.time()
     rx, ry = bidir_a_star.planning(sx, sy, gx, gy)
     end_time = time.time()
     print("程序计算时间为：", end_time - start_time, "秒")
     if True:  # pragma: no cover
-        plt.plot(ox, oy, ".k")
-        plt.plot(sx, sy, "og")
-        plt.plot(gx, gy, "ob")
-        plt.grid(True)
         plt.axis("equal")
         plt.plot(rx, ry, "-r")
         plt.pause(.0001)

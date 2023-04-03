@@ -152,7 +152,7 @@ class Robot:
         self.strategy_dict = {}
         if len(self.path) > 0:
             self.path_x, self.path_y = self.path[0]  #可优化
-        if self.x_ is None or self.y_ is None:
+        if self.x_ is None or self.y_ is None or self.is_assigned_task==0:
             stop_strategy = {FORWARD: 0, ROTATE: 0}
             self.strategy_dict = stop_strategy
             return
@@ -168,8 +168,8 @@ class Robot:
             self.is_plan = False
             return
         #如果到达路径点则更新到下一个路径点并在path中删除已经到达的路径点
-        if len(self.path)>2:
-            if distance<ROBO_HANDLE_DIST*2:
+        if len(self.path)>1:
+            if distance<ROBO_HANDLE_DIST*1.5:
                 self.path.pop(0)
                 if len(self.path) > 0:
                     self.path_x, self.path_y = self.path[0]  #可优化
