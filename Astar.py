@@ -1,5 +1,5 @@
 import math
-
+import numpy as np
 
 class AStarPlanner:
 
@@ -131,8 +131,11 @@ class AStarPlanner:
         """
         # 之后可以视情况更换启发函数
         w = 1.0  # weight of heuristic
-        d = w * math.hypot(n1.x - n2.x, n1.y - n2.y)
-        return d
+        dx = np.abs(n1.x - n2.x)  #  Diagnol distance
+        dy = np.abs(n1.y - n2.y)
+        min_xy = min(dx, dy)
+        h = dx + dy + (math.sqrt(2) - 2) * min_xy
+        return h*w
 
     def calc_grid_position(self, index, min_position):
         """
