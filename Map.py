@@ -1,9 +1,8 @@
 import random
-import time
 
 import numpy as np
 
-from Astar import *
+from b_Astar import *
 from Params import *
 
 random.seed(RAND_SEED)
@@ -346,32 +345,6 @@ class Robot:
             self.strategy_dict = stop_strategy
             return
 
-        distance = get_distance(self.x, self.x_, self.y, self.y_)
-        if distance < ROBO_HANDLE_DIST:
-            stop_strategy = {FORWARD: 0, ROTATE: 0, self.arrive(): -1}
-            self.strategy_dict = stop_strategy
-            return
-
-        theta = get_theta(self.x, self.x_, self.y, self.y_)
-        angle = get_angle(self.direction, theta)
-
-        speed = min(distance / self.delta_time, MAX_FORE_SPEED)
-        if abs(angle) > np.pi / 2 - 0.1:
-            if distance < 8 * ROBO_HANDLE_DIST:
-                speed = 0
-                self.is_avoid = True
-            else:
-                speed = 2
-        if distance < 4 * ROBO_HANDLE_DIST:
-            if abs(angle) > np.pi / 4:
-                speed = distance / 2 * ROBO_HANDLE_DIST
-                self.is_avoid = True
-        rotate_speed = min(abs(angle) / self.delta_time, MAX_ROTATE_SPEED)
-        self.strategy_dict = {
-            FORWARD: speed,
-            ROTATE: np.sign(angle) * rotate_speed
-        }
-
     def strategy2(self):
         self.strategy_dict = {}
 
@@ -411,7 +384,7 @@ class Robot:
         self.strategy_dict = {}
         if len(self.path) > 0:
             self.path_x, self.path_y = self.path[0]  #可优化
-        if self.x_ is None or self.y_ is None or len(self.path) == 0:
+        if self.x_ is None or self.y_ is None:
             stop_strategy = {FORWARD: 0, ROTATE: 0}
             self.strategy_dict = stop_strategy
             return
@@ -427,7 +400,52 @@ class Robot:
             self.is_plan = False
             return
         #如果到达路径点则更新到下一个路径点并在path中删除已经到达的路径点
-        if distance < ROBO_HANDLE_DIST:
+        if len(self.path)>2:
+            if distance<ROBO_HANDLE_DIST*2:
+                self.path.pop(0)
+                if len(self.path) > 0:
+                    self.path_x, self.path_y = self.path[0]  #可优化
+        else:
+            if distance<ROBO_HANDLE_DIST:
+                self.path.pop(0)
+                if len(self.path) > 0:
+                    self.path_x, self.path_y = self.path[0]  #可优化
+
+        theta = get_theta(self.x, self.path_x, self.y, self.path_y)
+        angle = get_angle(self.direction, theta)
+
+        speed = min(distance / self.delta_time, MAX_FORE_SPEED)
+        if abs(angle) > np.pi / 2 - 0.1:
+            speed = 0
+        if abs(angle) > np.pi / 4:
+            speed = 0
+        rotate_speed = min(abs(angle) / self.delta_time, MAX_ROTATE_SPEED)
+        self.strategy_dict = {
+            FORWARD: speed,
+            ROTATE: np.sign(angle) * rotate_speed
+        }
+    #轨迹跟踪规划
+    def strategy_path4(self):
+        self.strategy_dict = {}
+        if len(self.path) > 0:
+            self.path_x, self.path_y = self.path[0]  #可优化
+        if self.x_ is None or self.y_ is None:
+            stop_strategy = {FORWARD: 0, ROTATE: 0}
+            self.strategy_dict = stop_strategy
+            return
+        if len(self.path) == 0:
+            self.is_plan = False
+            return
+        distance = get_distance(self.x, self.path_x, self.y, self.path_y)
+        distance2 = get_distance(self.x, self.x_, self.y, self.y_)
+        # 如果已经到达目的地则将小车变为未规划状态
+        if distance2 < ROBO_HANDLE_DIST:
+            stop_strategy = {FORWARD: 0, ROTATE: 0, self.arrive(): -1}
+            self.strategy_dict = stop_strategy
+            self.is_plan = False
+            return
+        #如果到达路径点则更新到下一个路径点并在path中删除已经到达的路径点
+        if distance<ROBO_HANDLE_DIST:
             self.path.pop(0)
             if len(self.path) > 0:
                 self.path_x, self.path_y = self.path[0]  #可优化
@@ -445,7 +463,6 @@ class Robot:
             FORWARD: speed,
             ROTATE: np.sign(angle) * rotate_speed
         }
-
     def arrive(self):
         if self.todo_type == BUY:
             self.handle.is_assigned_pickup = 0
@@ -496,7 +513,7 @@ class Map:
         self.choose = 2
         self.ox = []
         self.oy = []
-        self.a_star = AStarPlanner(MAP1_OX, MAP1_OY, 0.5, 1)
+        self.a_star = BidirectionalAStarPlanner(MAP1_OX, MAP1_OY, 0.6, 0.6)
         self.map_type = 1
 
     def update_map(self, frame, money):
@@ -512,13 +529,13 @@ class Map:
             self.map_type = 1
         elif num == 8:
             self.map_type = 2
-            self.a_star = AStarPlanner(MAP2_OX, MAP2_OY, 0.5, 0.8)
+            self.a_star = BidirectionalAStarPlanner2(MAP2_OX, MAP2_OY, 0.5, 0.7)
         elif num == 13:
             self.map_type = 3
-            self.a_star = AStarPlanner(MAP3_OX, MAP3_OY, 0.6, 1)
+            self.a_star = BidirectionalAStarPlanner(MAP3_OX, MAP3_OY, 0.6, 1)
         else:
             self.map_type = 4
-            self.a_star = AStarPlanner(MAP4_OX, MAP4_OY, 1, 0.5)
+            self.a_star = BidirectionalAStarPlanner2(MAP4_OX, MAP4_OY, 1, 0.7)
         for i in range(num):
             self.handle_list.append(Handle(id=i))
 
@@ -583,9 +600,18 @@ class Map:
                 r.is_plan = True
                 # print_to_txt(r.path, 1)
             r.is_avoid = False
-            #这里应当修改为沿路径行驶，还未修改。
+            #沿路径行驶。
             r.strategy_path()
-        # print_to_txt('final', 1)
+        # for i in range(ROBO_NUM-1):
+        #     r: Robot = self.robot_list[i]
+        #     for j in range(i+1, ROBO_NUM):
+        #         r_: Robot = self.robot_list[j]
+        #         if (get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 10 and 
+        #             abs(abs(r.direction - r_.direction)-np.pi) < np.pi/6):
+        #             theta = get_theta(r.x, r_.x, r.y, r_.y)
+        #             angle = get_angle(r.direction, theta)
+        #             rotate_speed = -np.sign(angle) * np.pi
+        #             r.strategy_dict[1] = rotate_speed
         for r in self.robot_list:
             #如果靠近边缘则限制最大速度
             if r.get_speed() > 4:
@@ -599,25 +625,90 @@ class Map:
         # print_to_txt(self.frame, 1)
         # print_to_txt(outputs, 1)
         return outputs
-
     def output_strategy2(self):
         outputs = ""
+        # print_to_txt('frame: ' + str(self.frame), 1)
         for r in self.robot_list:
+            # print_to_txt(r.id, 1)
+            #如果有任务且还没有进行路径规划则进行路径规划
+            if r.is_assigned_task != 0 and r.is_plan == False:
+                # print_to_txt(
+                #     str(r.x) + ' ' + str(r.y) + ' ' + str(r.x_) + ' ' +
+                #     str(r.y_), 1)
+                r.path = self.a_star.planning(r.x, r.y, r.x_, r.y_)
+                # if (len(r.path) == 1):
+                #     r.arrive()
+                #     break
+                r.is_plan = True
+                # print_to_txt(r.path, 1)
             r.is_avoid = False
-            r.strategy()
-
+            #沿路径行驶。
+            r.strategy_path()
+        for i in range(ROBO_NUM-1):
+            r: Robot = self.robot_list[i]
+            for j in range(i+1, ROBO_NUM):
+                r_: Robot = self.robot_list[j]
+                if (get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 10 and 
+                    abs(abs(r.direction - r_.direction)-np.pi) < np.pi/6):
+                    theta = get_theta(r.x, r_.x, r.y, r_.y)
+                    angle = get_angle(r.direction, theta)
+                    rotate_speed = -np.sign(angle) * np.pi
+                    r.strategy_dict[1] = rotate_speed
         for r in self.robot_list:
             #如果靠近边缘则限制最大速度
-            if r.get_speed() > 0:
-                r.set_speed(0)
+            if r.get_speed() > 4:
+                r.set_speed(4)
             # if r.is_recede:
             #     r.is_recede -= 1
             output = self.strategy_to_str(r)
             if output == "":
                 continue
             outputs += output
+        # print_to_txt(self.frame, 1)
+        # print_to_txt(outputs, 1)
         return outputs
-
+    def output_strategy4(self):
+        outputs = ""
+        # print_to_txt('frame: ' + str(self.frame), 1)
+        for r in self.robot_list:
+            # print_to_txt(r.id, 1)
+            #如果有任务且还没有进行路径规划则进行路径规划
+            if r.is_assigned_task != 0 and r.is_plan == False:
+                # print_to_txt(
+                #     str(r.x) + ' ' + str(r.y) + ' ' + str(r.x_) + ' ' +
+                #     str(r.y_), 1)
+                r.path = self.a_star.planning(r.x, r.y, r.x_, r.y_)
+                # if (len(r.path) == 1):
+                #     r.arrive()
+                #     break
+                r.is_plan = True
+                # print_to_txt(r.path, 1)
+            r.is_avoid = False
+            #沿路径行驶。
+            r.strategy_path4()
+        for i in range(ROBO_NUM-1):
+            r: Robot = self.robot_list[i]
+            for j in range(i+1, ROBO_NUM):
+                r_: Robot = self.robot_list[j]
+                if (get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 10 and 
+                    abs(abs(r.direction - r_.direction)-np.pi) < np.pi/6):
+                    theta = get_theta(r.x, r_.x, r.y, r_.y)
+                    angle = get_angle(r.direction, theta)
+                    rotate_speed = -np.sign(angle) * np.pi
+                    r.strategy_dict[1] = rotate_speed
+        for r in self.robot_list:
+            #限制最大速度
+            if r.get_speed() > 4:
+                r.set_speed(4)
+            # if r.is_recede:
+            #     r.is_recede -= 1
+            output = self.strategy_to_str(r)
+            if output == "":
+                continue
+            outputs += output
+        # print_to_txt(self.frame, 1)
+        # print_to_txt(outputs, 1)
+        return outputs
     def get_short_material(self):
         short_material = set()
         for h in self.handle_list:

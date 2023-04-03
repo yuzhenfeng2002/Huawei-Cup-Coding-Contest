@@ -49,8 +49,10 @@ if __name__ == '__main__':
         m.set_robots_targets()
 
         sys.stdout.write('%d\n' % frame)
-        if m.map_type == 3:
+        if m.map_type == 3 or m.map_type == 1:
             sys.stdout.write(m.output_strategy2())
+        elif m.map_type == 4:
+            sys.stdout.write(m.output_strategy4())
         else:
             sys.stdout.write(m.output_strategy())
         finish()
