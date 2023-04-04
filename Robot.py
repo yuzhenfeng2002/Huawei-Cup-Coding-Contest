@@ -65,6 +65,10 @@ class Robot:
         self.path = []
         self.path_x = None
         self.path_y = None
+        # 机器人是否要等待其他机器人通过
+        self.is_wait = False
+        # 机器人任务的价值
+        self.value = 0
 
     def get_speed(self):
         return np.sqrt(self.speed_x**2 + self.speed_y**2)
@@ -152,7 +156,7 @@ class Robot:
         self.strategy_dict = {}
         if len(self.path) > 0:
             self.path_x, self.path_y = self.path[0]  #可优化
-        if self.x_ is None or self.y_ is None or self.is_assigned_task==0:
+        if self.x_ is None or self.y_ is None or self.is_assigned_task==0 or self.is_wait:
             stop_strategy = {FORWARD: 0, ROTATE: 0}
             self.strategy_dict = stop_strategy
             return
@@ -197,7 +201,7 @@ class Robot:
         self.strategy_dict = {}
         if len(self.path) > 0:
             self.path_x, self.path_y = self.path[0]  #可优化
-        if self.x_ is None or self.y_ is None:
+        if self.x_ is None or self.y_ is None or self.is_wait:
             stop_strategy = {FORWARD: 0, ROTATE: 0}
             self.strategy_dict = stop_strategy
             return

@@ -93,7 +93,7 @@ if __name__ == '__main__':
         if m.map_type == 3 or m.map_type == 1:
             sys.stdout.write(m.output_strategy2())
         elif m.map_type == 4:
-            sys.stdout.write(m.output_strategy4())
+            sys.stdout.write(m.output_strategy2())
         else:
             sys.stdout.write(m.output_strategy())
         finish()

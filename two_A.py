@@ -8,7 +8,7 @@ show_animation = True
 
 class BidirectionalAStarPlanner:
 
-    def __init__(self,resolution, rr):
+    def __init__(self, ox, oy, resolution, rr):
         """
         Initialize grid map for a star planning
 
@@ -23,7 +23,7 @@ class BidirectionalAStarPlanner:
         self.x_width, self.y_width, self.obstacle_map = None, None, None
         self.resolution = resolution
         self.rr = rr
-        self.obstacle_map=[]
+        self.calc_obstacle_map(ox, oy)
         self.motion = self.get_motion_model()
 
     class Node:
@@ -87,21 +87,6 @@ class BidirectionalAStarPlanner:
 
             current_B = open_set_B[c_id_B]
 
-            # show graph
-            if show_animation:  # pragma: no cover
-                plt.plot(self.calc_grid_position(current_A.x, self.min_x),
-                         self.calc_grid_position(current_A.y, self.min_y),
-                         "xc")
-                plt.plot(self.calc_grid_position(current_B.x, self.min_x),
-                         self.calc_grid_position(current_B.y, self.min_y),
-                         "xc")
-                # for stopping simulation with the esc key.
-                plt.gcf().canvas.mpl_connect(
-                    'key_release_event',
-                    lambda event: [exit(0) if event.key == 'escape' else None])
-                if len(closed_set_A.keys()) % 10 == 0:
-                    plt.pause(0.001)
-
             if current_A.x == current_B.x and current_A.y == current_B.y:
                 # print("Found goal")
                 meet_point_A = current_A
@@ -155,14 +140,15 @@ class BidirectionalAStarPlanner:
 
         rx, ry = self.calc_final_bidirectional_path(
             meet_point_A, meet_point_B, closed_set_A, closed_set_B)
-
-        return rx, ry
+        if len(rx) != len(ry):
+            return list(0, 0)
+        return list(zip(rx, ry))
 
     # takes two sets and two meeting nodes and return the optimal path
     def calc_final_bidirectional_path(self, n1, n2, setA, setB):
         #加入找不到路径的判断
         if(n1==None or n2==None):
-            return -1, -1
+            return [-1], [-1]
         rx_A, ry_A = self.calc_final_path(n1, setA)
         rx_B, ry_B = self.calc_final_path(n2, setB)
         rx_A.reverse()
@@ -200,7 +186,6 @@ class BidirectionalAStarPlanner:
     def calc_heuristic(n1, n2):
         w = 1.0  # weight of heuristic
         d = w * math.hypot(n1.x - n2.x, n1.y - n2.y)
-        # d = w*np.abs(n1.x - n2.x) + np.abs(n1.y - n2.y)
         return d
 
     def find_total_cost(self, open_set, lambda_, n1):
@@ -240,7 +225,7 @@ class BidirectionalAStarPlanner:
             return False
 
         # collision check
-        if(node.x>len(self.obstacle_map)-1):
+        if node.x > len(self.obstacle_map)-1 or node.y > len(self.obstacle_map[0])-1:
             return False
         if self.obstacle_map[node.x][node.y]:
             return False
@@ -249,20 +234,13 @@ class BidirectionalAStarPlanner:
 
     def calc_obstacle_map(self, ox, oy):
 
-        self.min_x = 0
-        self.min_y = 0
-        self.max_x = 50
-        self.max_y = 50
-        # print("min_x:", self.min_x)
-        # print("min_y:", self.min_y)
-        # print("max_x:", self.max_x)
-        # print("max_y:", self.max_y)
+        self.min_x = round(min(ox))
+        self.min_y = round(min(oy))
+        self.max_x = round(max(ox))
+        self.max_y = round(max(oy))
 
-        self.x_width = round(50 / self.resolution)
-        self.y_width = round(50 / self.resolution)
-        # print("x_width:", self.x_width)
-        # print("y_width:", self.y_width)
-
+        self.x_width = round((self.max_x - self.min_x) / self.resolution)
+        self.y_width = round((self.max_y - self.min_y) / self.resolution)
         # obstacle map generation
         self.obstacle_map = [[False for _ in range(self.y_width)]
                              for _ in range(self.x_width)]
@@ -287,21 +265,33 @@ class BidirectionalAStarPlanner:
                   [-1, 1, math.sqrt(2)],
                   [1, -1, math.sqrt(2)],
                   [1, 1, math.sqrt(2)]]
-                #   [-1, 2, math.sqrt(5)],
-                #   [1, 2, math.sqrt(5)],
-                #   [-2, 1, math.sqrt(5)],
-                #   [2, 1, math.sqrt(5)],
-                #   [-2, -1, math.sqrt(5)],
-                #   [2, -1, math.sqrt(5)],
-                #   [-1, -2, math.sqrt(5)],
-                #   [1, -2, math.sqrt(5)]]
 
         return motion
+    def get_turning_points(self,path):
+        turning_points = []
+        for i in range(1, len(path) - 1):
+            p1 = path[i-1]
+            p2 = path[i]
+            p3 = path[i+1]
+            angle = self.get_angle(p1, p2, p3)
+            if angle != 180:
+                turning_points.append(p2)
+        return turning_points
+
+    def get_angle(self, p1, p2, p3):
+        v1 = (p1[0] - p2[0], p1[1] - p2[1])
+        v2 = (p3[0] - p2[0], p3[1] - p2[1])
+        dot_product = v1[0]*v2[0] + v1[1]*v2[1]
+        len1 = math.sqrt(v1[0]**2 + v1[1]**2)
+        len2 = math.sqrt(v2[0]**2 + v2[1]**2)
+        cos_theta = dot_product / (len1 * len2)
+        angle = math.acos(cos_theta) * 180 / math.pi
+        return angle
 
 def main():
     print(__file__ + " start!!")
     map_array = []
-    file_path = '../maps/2.txt'
+    file_path = '../maps/3.txt'
     with open(file_path, 'r') as f:
         for line in f:
             row = [1 if c == '#' else 0 for c in line.strip()]
@@ -309,10 +299,10 @@ def main():
     # start and goal position
     sx = 5.0  # [m]
     sy = 5.0  # [m]
-    gx = 45.0  # [m]
-    gy = 40.0  # [m]
+    gx = 30.0  # [m]
+    gy = 25.0  # [m]
     grid_size = 1# [m]
-    robot_radius = 0.5  # [m]
+    robot_radius = 0.7  # [m]
     # set obstacle positions
     ox, oy = [], []
     for i in range(0, 50):
@@ -330,8 +320,8 @@ def main():
     for i in range(len(map_array)-1):
         for j in range(len(map_array)-1):
             if map_array[i][j] == 1:
-                ox.append(j * 0.5+0.25)
-                oy.append(-i * 0.5 + 50+0.25)
+                ox.append(j * 0.5-0.25)
+                oy.append(-i * 0.5 - 50+0.25)
     # # # set obstacle positions
     # ox, oy = [], []
     # for i in range(-10, 60):
@@ -353,7 +343,7 @@ def main():
     #     ox.append(40.0)
     #     oy.append(60.0 - i)
     print("ox:"+str(len(ox)))
-    bidir_a_star = BidirectionalAStarPlanner(grid_size, robot_radius)
+    bidir_a_star = BidirectionalAStarPlanner(ox,oy,grid_size, robot_radius)
     bidir_a_star.calc_obstacle_map(ox,oy)
     # for i in range(0, 20):
     #     ox.append(40.0)
@@ -364,12 +354,15 @@ def main():
     plt.grid(True)
     bidir_a_star.calc_obstacle_map(ox,oy)
     start_time = time.time()
-    rx, ry = bidir_a_star.planning(sx, sy, gx, gy)
+    path = bidir_a_star.planning(sx, sy, gx, gy)
+    # path = bidir_a_star.get_turning_points(path)
     end_time = time.time()
     print("程序计算时间为：", end_time - start_time, "秒")
     if True:  # pragma: no cover
         plt.axis("equal")
-        plt.plot(rx, ry, "-r")
+        x_values = [coord[0] for coord in path]
+        y_values = [coord[1] for coord in path]
+        plt.plot(x_values, y_values, "-r")
         plt.pause(.0001)
         plt.show()
 

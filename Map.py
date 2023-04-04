@@ -131,7 +131,9 @@ class Map:
         self.ox = []
         self.oy = []
         self.map_type = 1
-
+        # 记录无效的小车和工作台
+        self.r_npath = []
+        self.h_npath = []
     def update_map(self, frame, money):
         self.frame = frame
         self.money = money
@@ -203,50 +205,49 @@ class Map:
             elif s == DESTROY:
                 strategy_str += "destroy {:.0f}\n".format(robot.id)
         return strategy_str
+    def get_conflict_nodes(self, path1, path2):
+        conflict_nodes = []
+        for node in path1:
+            if node in path2:
+                conflict_nodes.append(node)
+        return conflict_nodes
     #地图2的策略
     def output_strategy(self):
         outputs = ""
-        # print_to_txt('frame: ' + str(self.frame), 1)
         for r in self.robot_list:
-            # print_to_txt(r.id, 1)
-            # print_to_txt(r.is_assigned_task, 1)
             #如果有任务且还没有进行路径规划则进行路径规划
             if r.is_assigned_task != 0 and r.is_plan == False:
                 r.path = self.a_star.planning(r.x, r.y, r.x_, r.y_)
-                # print_to_txt(
-                #     str(r.x) + ' ' + str(r.y) + ' ' + str(r.x_) + ' ' +
-                #     str(r.y_), 1)
-                # if (len(r.path) == 1):
-                #     r.arrive()
-                #     break
                 r.is_plan = True
-                # print_to_txt(r.path, 1)
-            r.is_avoid = False
+            r.is_wait = False
             #沿路径行驶。
             r.strategy_path()
-        #如果两车对向相撞则重新规划路线
+        #如果两车过于靠近则检测路径是否冲突
         for i in range(ROBO_NUM-1):
             r: Robot = self.robot_list[i]
             for j in range(i+1, ROBO_NUM):
                 r_: Robot = self.robot_list[j]
-                if (get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 2 and 
-                    abs(abs(r.direction - r_.direction)-np.pi) < np.pi/6):
-                    if(r.is_assigned_task==0 or r_.is_assigned_task==0):
-                        continue
-                    ix = int(r_.x/self.a_star.resolution)
-                    iy = int(r_.y/self.a_star.resolution)
-                    self.a_star.obstacle_map[ix][iy] = True
-                    r.path = self.a_star.planning(r.x, r.y, r.x_, r.y_)
-                    self.a_star.obstacle_map[ix][iy] = False
-                    # ix = int(r.x/self.a_star.resolution)
-                    # iy = int(r.y/self.a_star.resolution)
-                    # self.a_star.obstacle_map[ix][iy] = True
-                    # r_.path = self.a_star.planning(r_.x, r_.y, r_.x_, r_.y_)
-                    # self.a_star.obstacle_map[ix][iy] = False
+                distance = get_distance(r.x, r_.x, r.y, r_.y)
+                if distance < ROBO_RADIUS_FULL * 3:
+                    conflict_nodes = self.get_conflict_nodes(r.path,r_.path)
+                    if len(conflict_nodes)>0 or distance<ROBO_RADIUS_FULL * 2:
+                        r.is_wait = True
+        #  TODO 使用人工势场法对路径进行修正
+        # for i in range(ROBO_NUM):
+        #     r: Robot = self.robot_list[i]
+        #     # 计算障碍物对小车的斥力
+        #     for j in range(ROBO_NUM):
+        #         if i==j:
+        #             continue
+        #         r_: Robot = self.robot_list[j]
+        #         if get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 2:
+        #             conflict_nodes = self.get_conflict_nodes(r.path,r_.path)
+        #             if len(conflict_nodes)>0:
+        #                 r.is_wait = True
         for r in self.robot_list:
             #如果靠近边缘则限制最大速度
-            if r.get_speed() > 4:
-                r.set_speed(4)
+            if r.get_speed() > 5:
+                r.set_speed(5)
             output = self.strategy_to_str(r)
             if output == "":
                 continue
@@ -272,7 +273,7 @@ class Map:
                 # print_to_txt(r.path, 1)
             r.is_avoid = False
             #沿路径行驶。
-            r.strategy_path()
+            r.strategy()
         for i in range(ROBO_NUM-1):
             r: Robot = self.robot_list[i]
             for j in range(i+1, ROBO_NUM):
@@ -303,28 +304,22 @@ class Map:
             # print_to_txt(r.id, 1)
             #如果有任务且还没有进行路径规划则进行路径规划
             if r.is_assigned_task != 0 and r.is_plan == False:
-                # print_to_txt(
-                #     str(r.x) + ' ' + str(r.y) + ' ' + str(r.x_) + ' ' +
-                #     str(r.y_), 1)
                 r.path = self.a_star.planning(r.x, r.y, r.x_, r.y_)
-                # if (len(r.path) == 1):
-                #     r.arrive()
-                #     break
                 r.is_plan = True
-                # print_to_txt(r.path, 1)
-            r.is_avoid = False
             #沿路径行驶。
             r.strategy_path4()
+        #如果两车过于靠近则检测路径是否冲突
         for i in range(ROBO_NUM-1):
             r: Robot = self.robot_list[i]
             for j in range(i+1, ROBO_NUM):
                 r_: Robot = self.robot_list[j]
-                if (get_distance(r.x, r_.x, r.y, r_.y) < ROBO_RADIUS_FULL * 10 and 
-                    abs(abs(r.direction - r_.direction)-np.pi) < np.pi/6):
-                    theta = get_theta(r.x, r_.x, r.y, r_.y)
-                    angle = get_angle(r.direction, theta)
-                    rotate_speed = -np.sign(angle) * np.pi
-                    r.strategy_dict[1] = rotate_speed
+                distance = get_distance(r.x, r_.x, r.y, r_.y)
+                if distance < ROBO_RADIUS_FULL * 3:
+                    conflict_nodes = self.get_conflict_nodes(r.path,r_.path)
+                    if len(conflict_nodes)>0 or distance<ROBO_RADIUS_FULL * 1.5:
+                        r.is_wait = True
+                    else:
+                        r.is_wait = False
         for r in self.robot_list:
             #限制最大速度
             if r.get_speed() > 4:
@@ -398,7 +393,7 @@ class Map:
                         if h.handle_type in h_.material_shortage:
                             break
                     if get_distance(r.x, h.x, r.y, h.y) + get_distance(
-                            h.x, h_.x, h.y, h_.y) < left_max_distance * 0.8:
+                            h.x, h_.x, h.y, h_.y) < left_max_distance * 0.7:
                         r.add_task(h.x, h.y, BUY, self.frame)
                         h.is_assigned_pickup = 1
                         delivery_origins.pop(h_idx)

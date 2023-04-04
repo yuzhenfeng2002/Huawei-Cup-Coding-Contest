@@ -2,7 +2,7 @@ import numpy as np
 
 RAND_SEED = 42
 
-TOTAL_TIME = 3
+TOTAL_TIME = 5
 MAP_SIZE = 50
 ROBO_NUM = 4
 FPS = 50
